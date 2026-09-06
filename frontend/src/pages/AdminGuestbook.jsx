@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Download, Search } from "lucide-react";
+import { ArrowLeft, Download, Search, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/VillageBrand";
+import { useConfirm } from '@/components/confirmContext';
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const formatTime = (value) =>
@@ -29,7 +30,8 @@ async function downloadExport() {
   URL.revokeObjectURL(url);
 }
 
-export default function AdminGuestbook() {
+export default function AdminGuestbook({ onDataChanged }) {
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
@@ -59,6 +61,7 @@ export default function AdminGuestbook() {
   }, [items, query]);
 
   async function changeStatus(id, status) {
+    try {
     const response = await fetch(`${API}/admin/guestbook/${id}/status`, {
       method: "PATCH",
       credentials: "include",
@@ -66,11 +69,25 @@ export default function AdminGuestbook() {
       body: JSON.stringify({ status }),
     });
     const body = await response.json();
-    if (!response.ok) return setNotice(body.message);
+    if (response.status === 401) return navigate('/admin/login', { replace: true });
+    if (!response.ok) throw new Error(body.message);
     setItems((current) =>
       current.map((item) => (item.id === id ? body.data : item)),
     );
     setNotice(body.message);
+    onDataChanged?.();
+    } catch (error) { setNotice(error.message || 'Status belum dapat diperbarui.'); }
+  }
+
+  function remove(item) {
+    confirm({ title: 'Hapus kunjungan ini?', itemName: `${item.name} — ${item.visit_purpose}`, description: 'Catatan kunjungan ini akan dihapus permanen dari buku tamu, ringkasan dashboard, dan ekspor Excel.', onConfirm: async () => {
+      const response = await fetch(`${API}/admin/guestbook/${item.id}`, { method: 'DELETE', credentials: 'include' });
+      const body = await response.json();
+      if (!response.ok) throw new Error(response.status === 401 ? 'Sesi berakhir. Silakan login kembali.' : body.message);
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setNotice(body.message);
+      onDataChanged?.();
+    } });
   }
 
   return (
@@ -88,7 +105,7 @@ export default function AdminGuestbook() {
         </div>
       </header>
       {notice && (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border bg-white px-5 py-4 text-sm font-semibold shadow-xl">
+        <div role="status" className="fixed bottom-5 right-5 z-50 rounded-xl border bg-white px-5 py-4 text-sm font-semibold shadow-xl">
           {notice}
         </div>
       )}
@@ -140,6 +157,7 @@ export default function AdminGuestbook() {
                     "Pesan",
                     "Tanggal Kunjungan",
                     "Status",
+                    "Aksi",
                   ].map((title) => (
                     <th key={title} className="px-4 py-4 font-semibold">
                       {title}
@@ -180,6 +198,7 @@ export default function AdminGuestbook() {
                     </td>
                     <td className="px-4 py-4">
                       <select
+                        aria-label={`Status kunjungan ${item.name}`}
                         value={item.status}
                         onChange={(event) =>
                           changeStatus(item.id, event.target.value)
@@ -191,12 +210,15 @@ export default function AdminGuestbook() {
                         <option value="selesai">Selesai</option>
                       </select>
                     </td>
+                    <td className="px-4 py-4">
+                      <button type="button" onClick={() => remove(item)} aria-label={`Hapus kunjungan ${item.name}`} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"><Trash2 size={16} />Hapus</button>
+                    </td>
                   </tr>
                 ))}
                 {!filtered.length && (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="8"
                       className="px-5 py-12 text-center text-stone-500"
                     >
                       Data tidak ditemukan.

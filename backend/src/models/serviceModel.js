@@ -1,7 +1,9 @@
 const { pool: db } = require('../config/database')
 
 async function findAll({ includeInactive = false } = {}) {
-  const where = includeInactive ? '' : 'WHERE service.is_active = TRUE'
+  const where = includeInactive
+    ? 'WHERE service.deleted_at IS NULL'
+    : 'WHERE service.deleted_at IS NULL AND service.is_active = TRUE'
   const [services] = await db.query(`
     SELECT service.*
     FROM service_types service
@@ -87,10 +89,13 @@ async function update(id, service) {
     const [result] = await connection.execute(
       `UPDATE service_types
        SET name = ?, description = ?, estimated_days = ?, is_active = ?
-       WHERE id = ?`,
+       WHERE id = ? AND deleted_at IS NULL`,
       [service.name, service.description, service.estimatedDays, service.isActive, id],
     )
-    if (!result.affectedRows) return null
+    if (!result.affectedRows) {
+      await connection.rollback()
+      return null
+    }
 
     await connection.execute('DELETE FROM service_requirements WHERE service_type_id = ?', [id])
     for (const requirement of service.requirements) {
@@ -116,8 +121,35 @@ async function update(id, service) {
 }
 
 async function remove(id) {
-  const [result] = await db.execute('DELETE FROM service_types WHERE id = ?', [id])
-  return result.affectedRows > 0
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [rows] = await connection.execute(
+      'SELECT id FROM service_types WHERE id = ? AND deleted_at IS NULL FOR UPDATE', [id],
+    )
+    if (!rows.length) {
+      await connection.rollback()
+      return null
+    }
+    const [applications] = await connection.execute(
+      'SELECT id FROM service_applications WHERE service_type_id = ? LIMIT 1', [id],
+    )
+    const archived = applications.length > 0
+    if (archived) {
+      await connection.execute(
+        'UPDATE service_types SET is_active = FALSE, deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [id],
+      )
+    } else {
+      await connection.execute('DELETE FROM service_types WHERE id = ?', [id])
+    }
+    await connection.commit()
+    return { archived }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 
 module.exports = { findAll, findById, create, update, remove }

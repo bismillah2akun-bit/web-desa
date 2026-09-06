@@ -19,13 +19,24 @@ async function testConnection() {
 }
 
 async function initializeDatabase() {
+  const [tables] = await pool.query('SHOW TABLES')
+  const existingTables = new Set(tables.map((row) => Object.values(row)[0]))
   const schemaPath = path.resolve(__dirname, '../../sql/init.sql')
   const statements = fs.readFileSync(schemaPath, 'utf8')
     .split(';')
     .map((statement) => statement.trim())
     .filter(Boolean)
 
-  for (const statement of statements) await pool.query(statement)
+  for (const statement of statements) {
+    // Seed only newly created tables so deleted or renamed content stays that way after restart.
+    const seedTable = statement.match(/^INSERT\s+(?:IGNORE\s+)?INTO\s+([a-z_]+)/i)?.[1]
+    if (seedTable && existingTables.has(seedTable)) continue
+    await pool.query(statement)
+  }
+  const [columns] = await pool.query("SHOW COLUMNS FROM service_types LIKE 'deleted_at'")
+  if (!columns.length) {
+    await pool.query('ALTER TABLE service_types ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL')
+  }
 }
 
 module.exports = { pool, testConnection, initializeDatabase }

@@ -8,6 +8,30 @@ async function getGuestbook(_req, res) {
   return sendSuccess(res, { data: await adminDataModel.findGuestbook() })
 }
 
+async function getContacts(_req, res) {
+  return sendSuccess(res, { data: await adminDataModel.findContacts() })
+}
+
+async function updateContactStatus(req, res) {
+  const status = cleanText(req.body.status, 30)
+  if (!new Set(['baru', 'dibaca', 'selesai']).has(status)) {
+    throw new AppError('Status pesan tidak valid', 400)
+  }
+  const data = await adminDataModel.updateContactStatus(req.params.id, status)
+  if (!data) throw new AppError('Pesan tidak ditemukan', 404)
+  return sendSuccess(res, { data, message: 'Status pesan berhasil diperbarui' })
+}
+
+async function deleteContact(req, res) {
+  if (!await adminDataModel.deleteContact(req.params.id)) throw new AppError('Pesan tidak ditemukan', 404)
+  return sendSuccess(res, { message: 'Pesan berhasil dihapus' })
+}
+
+async function deleteGuestbook(req, res) {
+  if (!await adminDataModel.deleteGuestbook(req.params.id)) throw new AppError('Data buku tamu tidak ditemukan', 404)
+  return sendSuccess(res, { message: 'Data buku tamu berhasil dihapus' })
+}
+
 async function updateGuestbookStatus(req, res) {
   const allowed = new Set(['baru', 'dibaca', 'selesai'])
   const status = cleanText(req.body.status, 30)
@@ -25,4 +49,4 @@ async function exportExcel(_req, res) {
   return res.send(buffer)
 }
 
-module.exports = { getGuestbook, updateGuestbookStatus, exportExcel }
+module.exports = { getGuestbook, updateGuestbookStatus, exportExcel, getContacts, updateContactStatus, deleteContact, deleteGuestbook }

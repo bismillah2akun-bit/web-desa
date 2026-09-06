@@ -5,6 +5,28 @@ async function findGuestbook() {
   return rows
 }
 
+async function findContacts() {
+  const [rows] = await db.query('SELECT * FROM contacts ORDER BY created_at DESC, id DESC')
+  return rows
+}
+
+async function updateContactStatus(id, status) {
+  const [result] = await db.execute('UPDATE contacts SET status = ? WHERE id = ?', [status, id])
+  if (!result.affectedRows) return null
+  const [rows] = await db.execute('SELECT * FROM contacts WHERE id = ?', [id])
+  return rows[0]
+}
+
+async function deleteContact(id) {
+  const [result] = await db.execute('DELETE FROM contacts WHERE id = ?', [id])
+  return result.affectedRows > 0
+}
+
+async function deleteGuestbook(id) {
+  const [result] = await db.execute('DELETE FROM guestbook WHERE id = ?', [id])
+  return result.affectedRows > 0
+}
+
 async function updateGuestbookStatus(id, status) {
   const [result] = await db.execute('UPDATE guestbook SET status = ? WHERE id = ?', [status, id])
   if (!result.affectedRows) return null
@@ -47,4 +69,4 @@ async function getExportData() {
   return { applications, guestbook, contacts, news, services, demographics, areas }
 }
 
-module.exports = { findGuestbook, updateGuestbookStatus, getExportData }
+module.exports = { findGuestbook, updateGuestbookStatus, getExportData, findContacts, updateContactStatus, deleteContact, deleteGuestbook }

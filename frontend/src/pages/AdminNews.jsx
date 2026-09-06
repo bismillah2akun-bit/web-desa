@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/VillageBrand";
+import { useConfirm } from "@/components/confirmContext";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const mediaUrl = (value) =>
@@ -29,6 +30,7 @@ const emptyForm = {
 };
 
 export default function AdminNews() {
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -112,16 +114,28 @@ export default function AdminNews() {
   }
 
   async function remove(item) {
-    if (!window.confirm(`Hapus berita “${item.title}”?`)) return;
-    const response = await fetch(`${API}/admin/news/${item.id}`, {
-      method: "DELETE",
-      credentials: "include",
+    confirm({
+      title: "Hapus berita ini?",
+      itemName: item.title,
+      description:
+        "Berita beserta gambar unggahannya akan dihapus permanen dan tidak lagi tampil kepada warga.",
+      onConfirm: async () => {
+        const response = await fetch(`${API}/admin/news/${item.id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const body = await response.json();
+        if (!response.ok)
+          throw new Error(
+            response.status === 401
+              ? "Sesi berakhir. Silakan login kembali."
+              : body.message,
+          );
+        setItems((current) => current.filter((entry) => entry.id !== item.id));
+        if (editingId === item.id) reset();
+        setNotice(body.message);
+      },
     });
-    const body = await response.json();
-    if (!response.ok) return setNotice(body.message);
-    setItems((current) => current.filter((entry) => entry.id !== item.id));
-    if (editingId === item.id) reset();
-    setNotice(body.message);
   }
 
   async function toggle(item) {
@@ -245,7 +259,11 @@ export default function AdminNews() {
                 {(imageFile || form.image_url) && (
                   <div className="mt-3 overflow-hidden rounded-xl border bg-stone-50">
                     <img
-                      src={imageFile ? URL.createObjectURL(imageFile) : mediaUrl(form.image_url)}
+                      src={
+                        imageFile
+                          ? URL.createObjectURL(imageFile)
+                          : mediaUrl(form.image_url)
+                      }
                       alt="Preview gambar berita"
                       className="h-44 w-full object-cover"
                     />

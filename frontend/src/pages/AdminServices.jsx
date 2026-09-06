@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Edit3, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/VillageBrand";
+import { useConfirm } from "@/components/confirmContext";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const emptyRequirement = () => ({
@@ -15,6 +16,7 @@ const emptyRequirement = () => ({
 });
 
 export default function AdminServices() {
+  const confirm = useConfirm();
   const [services, setServices] = useState([]);
   const [requirements, setRequirements] = useState([emptyRequirement()]);
   const [notice, setNotice] = useState("");
@@ -115,21 +117,34 @@ export default function AdminServices() {
   }
 
   async function remove(service) {
-    if (
-      !window.confirm(
-        `Hapus layanan “${service.name}” beserta seluruh persyaratannya?`,
-      )
-    )
-      return;
-    const response = await fetch(`${API}/admin/services/${service.id}`, {
-      method: "DELETE",
-      credentials: "include",
+    confirm({
+      title: "Hapus layanan ini?",
+      itemName: service.name,
+      description:
+        "Layanan akan dihapus dari daftar pilihan warga. Jika sudah memiliki pengajuan, layanan diarsipkan agar riwayat dan dokumen warga tetap dapat diproses.",
+      onConfirm: async () => {
+        const response = await fetch(`${API}/admin/services/${service.id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const body = await response.json();
+        if (!response.ok)
+          throw new Error(
+            response.status === 401
+              ? "Sesi berakhir. Silakan login kembali."
+              : body.message,
+          );
+        setServices((current) =>
+          current.filter((item) => item.id !== service.id),
+        );
+        if (editingId === service.id) {
+          setEditingId(null);
+          setRequirements([emptyRequirement()]);
+          setServiceActive(true);
+        }
+        setNotice(body.message);
+      },
     });
-    const body = await response.json();
-    if (!response.ok) return setNotice(body.message);
-    setServices((current) => current.filter((item) => item.id !== service.id));
-    if (editingId === service.id) setEditingId(null);
-    setNotice(body.message);
   }
 
   return (
@@ -325,11 +340,19 @@ export default function AdminServices() {
                         type="button"
                         aria-label="Hapus persyaratan"
                         onClick={() =>
-                          setRequirements((current) =>
-                            current.filter(
-                              (_, itemIndex) => itemIndex !== index,
-                            ),
-                          )
+                          confirm({
+                            title: "Hapus persyaratan ini?",
+                            itemName:
+                              requirement.label || `Persyaratan ${index + 1}`,
+                            description:
+                              "Persyaratan akan dihapus dari formulir ini. Perubahan diterapkan setelah layanan disimpan.",
+                            onConfirm: () =>
+                              setRequirements((current) =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index,
+                                ),
+                              ),
+                          })
                         }
                         className="text-red-600"
                       >

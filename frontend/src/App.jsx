@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -37,16 +37,10 @@ import {
   Eye,
   EyeOff,
   LockKeyhole,
-  LogOut,
-  LayoutDashboard,
   ShieldCheck,
-  BookOpen,
-  MapPinned,
-  RefreshCw,
   Save,
   ArrowLeft,
   FileText,
-  Download,
 } from "lucide-react";
 import {
   Navbar,
@@ -64,6 +58,8 @@ import AdminApplications from "@/pages/AdminApplications";
 import TrackApplication from "@/pages/TrackApplication";
 import AdminGuestbook from "@/pages/AdminGuestbook";
 import AdminAreas from "@/pages/AdminAreas";
+import AdminOfficials from "@/pages/AdminOfficials";
+import AdminWorkspace from '@/pages/AdminWorkspace';
 import Brand from "@/components/VillageBrand";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api",
@@ -652,6 +648,7 @@ function GuestBook() {
     [sending, setSending] = useState(false);
   async function submit(e) {
     e.preventDefault();
+    const formElement = e.currentTarget;
     setSending(true);
     setStatus("");
     try {
@@ -659,7 +656,7 @@ function GuestBook() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            Object.fromEntries(new FormData(e.currentTarget)),
+            Object.fromEntries(new FormData(formElement)),
           ),
         }),
         json = await r.json();
@@ -667,7 +664,7 @@ function GuestBook() {
       setStatus(
         "Kunjungan berhasil dicatat. Terima kasih telah mengisi buku tamu.",
       );
-      e.currentTarget.reset();
+      formElement.reset();
     } catch (err) {
       setStatus(err.message || "Data kunjungan belum berhasil disimpan.");
     } finally {
@@ -1036,38 +1033,47 @@ function Profile() {
   );
 }
 function Government() {
-  const roles = [
-    "Kepala Desa",
-    "Sekretaris Desa",
-    "Kepala Urusan Tata Usaha",
-    "Kepala Urusan Keuangan",
-    "Kepala Seksi Pemerintahan",
-    "Kepala Seksi Kesejahteraan",
-    "Kepala Dusun I",
-    "Kepala Dusun II",
-  ];
+  const [officials, setOfficials] = useState([]);
+  useEffect(() => {
+    fetch(`${API}/officials`)
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((body) => setOfficials(body.data))
+      .catch(() => setOfficials([]));
+  }, []);
   return (
     <Layout>
       <PageHero
         tag="Pemerintahan Desa"
         title="Pelayanan yang hadir untuk masyarakat"
-        desc="Struktur pemerintahan berupa placeholder yang dapat diperbarui admin desa."
+        desc="Struktur perangkat Pemerintah Desa Tanjungjaya."
       />
       <section className="mx-auto max-w-7xl px-5 py-16">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {roles.map((r, i) => (
+          {officials.map((official, i) => (
             <article
-              key={r}
-              className={`rounded-2xl border p-6 ${i === 0 ? "border-forest-900 bg-forest-900 text-white" : "border-stone-200 bg-white"}`}
+              key={official.id}
+              className="official-card"
             >
-              <Users />
-              <p className="mt-6 text-xs font-bold uppercase tracking-wider text-earth-500">
-                {r}
+              <div className="official-card__top" aria-hidden="true">
+                <span className="official-card__icon"><Users size={22} strokeWidth={1.6} /></span>
+                <span className="official-card__number">{String(i + 1).padStart(2, "0")}</span>
+              </div>
+              <p className="official-card__position">
+                {official.position}
               </p>
-              <h3 className="mt-2 text-lg font-bold">Nama belum tersedia</h3>
-              <p className="mt-3 text-xs opacity-70">{note}</p>
+              <h3 className="official-card__name">
+                {official.name || "Nama belum tersedia"}
+              </h3>
+              <p className="official-card__description">
+                {official.description || note}
+              </p>
             </article>
           ))}
+          {!officials.length && (
+            <p className="col-span-full rounded-2xl border border-dashed p-10 text-center text-sm text-stone-500">
+              Struktur perangkat desa belum diisi oleh admin.
+            </p>
+          )}
         </div>
       </section>
     </Layout>
@@ -1621,15 +1627,16 @@ function Contact() {
   const [s, setS] = useState("");
   async function submit(e) {
     e.preventDefault();
+    const formElement = e.currentTarget;
     try {
       const r = await fetch(`${API}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
+        body: JSON.stringify(Object.fromEntries(new FormData(formElement))),
       });
       if (!r.ok) throw Error();
       setS("Pesan berhasil dikirim.");
-      e.currentTarget.reset();
+      formElement.reset();
     } catch {
       setS("Backend belum terhubung. Pesan belum tersimpan.");
     }
@@ -2084,287 +2091,9 @@ function AdminContentEditor() {
   );
 }
 function AdminDashboard() {
-  const [admin, setAdmin] = useState(null),
-    [dashboard, setDashboard] = useState(null),
-    [error, setError] = useState(""),
-    [activePanel, setActivePanel] = useState("dashboard"),
-    navigate = useNavigate();
-  const load = useCallback(async () => {
-    try {
-      const [session, summary] = await Promise.all([
-        fetch(`${API}/auth/me`, { credentials: "include" }),
-        fetch(`${API}/admin/dashboard`, { credentials: "include" }),
-      ]);
-      if (session.status === 401 || summary.status === 401)
-        return navigate("/admin/login", { replace: true });
-      if (!session.ok || !summary.ok)
-        throw new Error("Dashboard belum dapat dimuat.");
-      setError("");
-      setAdmin((await session.json()).data);
-      setDashboard((await summary.json()).data);
-    } catch (err) {
-      setError(err.message || "Dashboard belum dapat dimuat.");
-    }
-  }, [navigate]);
-  useEffect(() => {
-    load();
-  }, [load]);
-  async function logout() {
-    await fetch(`${API}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    navigate("/admin/login", { replace: true });
-  }
-  if (!admin && !error)
-    return (
-      <div className="grid min-h-screen place-items-center bg-sage-50 text-sm font-semibold text-forest-900">
-        Memuat dashboard admin...
-      </div>
-    );
-  const c = dashboard?.counts || {},
-    stats = [
-      [Newspaper, "Berita", c.news_count || 0],
-      [Building2, "Fasilitas", c.facility_count || 0],
-      [MapPinned, "Potensi", c.potential_count || 0],
-      [Mail, "Pesan baru", c.new_contact_count || 0],
-      [BookOpen, "Tamu baru", c.new_guestbook_count || 0],
-      [FileText, "Pengajuan aktif", c.active_application_count || 0],
-    ];
-  const dateTime = (v) =>
-    v
-      ? `${new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(v))} WIB`
-      : "—";
-  return (
-    <main className="min-h-screen bg-sage-50">
-      <header className="sticky top-0 z-20 border-b border-sage-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Brand />
-          <div className="flex items-center gap-4">
-            <div className="hidden text-right sm:block">
-              <b className="block text-sm">{admin?.displayName}</b>
-              <span className="text-xs capitalize text-stone-500">
-                {admin?.role}
-              </span>
-            </div>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-            >
-              <LogOut size={16} />
-              Keluar
-            </button>
-          </div>
-        </div>
-      </header>
-      {activePanel !== "dashboard" ? (
-        <div className="admin-embedded mx-auto max-w-7xl px-5 py-6">
-          <div className="mb-4 flex items-center justify-between rounded-2xl border border-sage-200 bg-white px-4 py-3">
-            <button
-              type="button"
-              onClick={() => {
-                setActivePanel("dashboard");
-                load();
-              }}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-forest-900 hover:bg-sage-100"
-            >
-              <ArrowLeft size={17} /> Ringkasan dashboard
-            </button>
-            <span className="hidden text-xs font-semibold uppercase tracking-wider text-stone-400 sm:block">
-              Panel admin
-            </span>
-          </div>
-          {activePanel === "guestbook" && <AdminGuestbook />}
-          {activePanel === "applications" && <AdminApplications />}
-          {activePanel === "news" && <AdminNews />}
-          {activePanel === "services" && <AdminServices />}
-          {activePanel === "profile" && <AdminContentEditor />}
-        </div>
-      ) : (
-      <div className="mx-auto max-w-7xl px-5 py-10">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.2em] text-earth-500">
-              Panel Administrasi
-            </p>
-            <h1 className="mt-3 font-serif text-4xl text-forest-950">
-              Selamat datang, {admin?.displayName}
-            </h1>
-            <p className="mt-3 text-stone-600">
-              Pantau informasi dan aktivitas terbaru website desa.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setActivePanel("guestbook")}
-              className="flex w-fit items-center gap-2 rounded-xl border border-forest-900 bg-white px-4 py-2.5 text-sm font-semibold text-forest-900"
-            >
-              <BookOpen size={16} />
-              Buku tamu
-            </button>
-            <a
-              href={`${API}/admin/export.xlsx`}
-              className="flex w-fit items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
-            >
-              <Download size={16} />
-              Export Excel
-            </a>
-            <button
-              type="button"
-              onClick={() => setActivePanel("applications")}
-              className="flex w-fit items-center gap-2 rounded-xl bg-forest-800 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              <FileText size={16} />
-              Pengajuan warga
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePanel("news")}
-              className="flex w-fit items-center gap-2 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              <Newspaper size={16} />
-              Kelola berita
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePanel("services")}
-              className="flex w-fit items-center gap-2 rounded-xl bg-earth-500 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              <FileText size={16} />
-              Kelola layanan
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePanel("profile")}
-              className="flex w-fit items-center gap-2 rounded-xl border border-forest-900 bg-white px-4 py-2.5 text-sm font-semibold text-forest-900"
-            >
-              <Save size={16} />
-              Kelola data
-            </button>
-            <button
-              onClick={load}
-              className="flex w-fit items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold"
-            >
-              <RefreshCw size={16} />
-              Muat ulang
-            </button>
-          </div>
-        </div>
-        {error && (
-          <div className="mt-7 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          {stats.map(([Icon, label, value]) => (
-            <article
-              key={label}
-              className="rounded-2xl border border-sage-200 bg-white p-5"
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-sage-100 text-forest-900">
-                <Icon size={19} />
-              </span>
-              <p className="mt-5 text-3xl font-bold text-forest-950">
-                {Number(value).toLocaleString("id-ID")}
-              </p>
-              <p className="mt-1 text-sm text-stone-500">{label}</p>
-            </article>
-          ))}
-        </section>
-        <section className="mt-8 grid gap-6 lg:grid-cols-2">
-          <article className="overflow-hidden rounded-2xl border border-sage-200 bg-white">
-            <div className="border-b border-stone-100 p-6">
-              <h2 className="font-serif text-2xl text-forest-950">
-                Buku tamu terbaru
-              </h2>
-              <p className="mt-1 text-sm text-stone-500">
-                Lima kunjungan terakhir dengan waktu pencatatan WIB.
-              </p>
-            </div>
-            <div className="divide-y divide-stone-100">
-              {dashboard?.recentGuestbook?.length ? (
-                dashboard.recentGuestbook.map((item) => (
-                  <div key={item.id} className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <b className="text-sm text-forest-950">{item.name}</b>
-                        <p className="mt-1 text-sm text-stone-600">
-                          {item.visit_purpose}
-                        </p>
-                        <p className="mt-2 text-xs text-stone-400">
-                          {item.institution || "Tanpa instansi"} ·{" "}
-                          {dateTime(item.created_at)}
-                        </p>
-                      </div>
-                      <span className="rounded-lg bg-sage-100 px-2.5 py-1 text-xs font-semibold text-forest-900">
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="p-8 text-center text-sm text-stone-500">
-                  Belum ada data kunjungan.
-                </p>
-              )}
-            </div>
-          </article>
-          <article className="overflow-hidden rounded-2xl border border-sage-200 bg-white">
-            <div className="border-b border-stone-100 p-6">
-              <h2 className="font-serif text-2xl text-forest-950">
-                Pesan terbaru
-              </h2>
-              <p className="mt-1 text-sm text-stone-500">
-                Lima pesan terakhir dari halaman kontak.
-              </p>
-            </div>
-            <div className="divide-y divide-stone-100">
-              {dashboard?.recentContacts?.length ? (
-                dashboard.recentContacts.map((item) => (
-                  <div key={item.id} className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <b className="text-sm text-forest-950">{item.name}</b>
-                        <p className="mt-1 text-sm text-stone-600">
-                          {item.subject}
-                        </p>
-                        <p className="mt-2 text-xs text-stone-400">
-                          {item.email} · {dateTime(item.created_at)}
-                        </p>
-                      </div>
-                      <span className="rounded-lg bg-earth-100 px-2.5 py-1 text-xs font-semibold text-earth-500">
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="p-8 text-center text-sm text-stone-500">
-                  Belum ada pesan masuk.
-                </p>
-              )}
-            </div>
-          </article>
-        </section>
-        <section className="mt-8 rounded-2xl border border-sage-200 bg-white p-6">
-          <div className="flex items-center gap-3">
-            <LayoutDashboard className="text-earth-500" />
-            <div>
-              <h2 className="font-bold text-forest-950">
-                Pengelolaan data aktif
-              </h2>
-              <p className="mt-1 text-sm text-stone-500">
-                Profil, demografi, layanan, serta kabar dan informasi warga
-                sudah dapat dikelola.
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
-      )}
-    </main>
-  );
+  const { pathname } = useLocation();
+  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
+  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, applications: AdminApplications, news: AdminNews, services: AdminServices, profile: AdminContentEditor, officials: AdminOfficials }} />;
 }
 function App() {
   return (
@@ -2382,11 +2111,12 @@ function App() {
         <Route path="/kontak" element={<Contact />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/profil" element={<AdminContentEditor />} />
-        <Route path="/admin/layanan" element={<AdminServices />} />
-        <Route path="/admin/berita" element={<AdminNews />} />
-        <Route path="/admin/pengajuan" element={<AdminApplications />} />
-        <Route path="/admin/buku-tamu" element={<AdminGuestbook />} />
+        <Route path="/admin/profil" element={<AdminDashboard />} />
+        <Route path="/admin/layanan" element={<AdminDashboard />} />
+        <Route path="/admin/berita" element={<AdminDashboard />} />
+        <Route path="/admin/pengajuan" element={<AdminDashboard />} />
+        <Route path="/admin/buku-tamu" element={<AdminDashboard />} />
+        <Route path="/admin/perangkat-desa" element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
   );

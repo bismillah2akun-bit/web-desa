@@ -8,6 +8,16 @@ CREATE TABLE IF NOT EXISTS demographic_summary (id INT UNSIGNED AUTO_INCREMENT P
 CREATE TABLE IF NOT EXISTS administrative_areas (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,rw_number VARCHAR(10) NOT NULL,rt_number VARCHAR(10) NOT NULL,household_count INT UNSIGNED,male_population INT UNSIGNED,female_population INT UNSIGNED,data_year SMALLINT UNSIGNED,source TEXT,status VARCHAR(30) DEFAULT 'belum_diverifikasi',updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_rw_rt(rw_number,rt_number)) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS guestbook (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,name VARCHAR(150) NOT NULL,institution VARCHAR(180),address TEXT,phone VARCHAR(30),email VARCHAR(180),visit_purpose VARCHAR(255) NOT NULL,message TEXT,visit_date DATE DEFAULT (CURRENT_DATE),status VARCHAR(30) DEFAULT 'baru',created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS admins (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,username VARCHAR(80) UNIQUE NOT NULL,display_name VARCHAR(150) NOT NULL,password_hash TEXT NOT NULL,role VARCHAR(30) DEFAULT 'admin',is_active BOOLEAN DEFAULT TRUE,last_login_at TIMESTAMP NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS government_officials (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  position VARCHAR(180) NOT NULL,
+  name VARCHAR(180),
+  description TEXT,
+  sort_order INT UNSIGNED DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS service_types (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(180) NOT NULL,
@@ -15,6 +25,7 @@ CREATE TABLE IF NOT EXISTS service_types (
   description TEXT,
   estimated_days INT UNSIGNED,
   is_active BOOLEAN DEFAULT TRUE,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -85,6 +96,14 @@ CREATE TABLE IF NOT EXISTS application_status_history (
 ) ENGINE=InnoDB;
 INSERT INTO village_profile(name,district,regency,province,postal_code,history,vision,mission) SELECT 'Desa Tanjungjaya','Cihampelas','Bandung Barat','Jawa Barat','40562','Wilayah Tanjungjaya semula merupakan bagian dari Desa Rancairung. Pemekaran disepakati pada 17 November 1972.','Data visi akan diperbarui oleh admin desa.','Data misi akan diperbarui oleh admin desa.' WHERE NOT EXISTS(SELECT 1 FROM village_profile);
 INSERT INTO demographic_summary(source,status) SELECT 'Menunggu data Pemerintah Desa Tanjungjaya','belum_diverifikasi' WHERE NOT EXISTS(SELECT 1 FROM demographic_summary);
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Desa',1 WHERE NOT EXISTS(SELECT 1 FROM government_officials);
+INSERT INTO government_officials(position,sort_order) SELECT 'Sekretaris Desa',2 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Sekretaris Desa');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Urusan Tata Usaha',3 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Urusan Tata Usaha');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Urusan Keuangan',4 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Urusan Keuangan');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Seksi Pemerintahan',5 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Seksi Pemerintahan');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Seksi Kesejahteraan',6 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Seksi Kesejahteraan');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Dusun I',7 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Dusun I');
+INSERT INTO government_officials(position,sort_order) SELECT 'Kepala Dusun II',8 WHERE NOT EXISTS(SELECT 1 FROM government_officials WHERE position='Kepala Dusun II');
 INSERT IGNORE INTO news(title,slug,category,summary,content) VALUES ('Informasi Pelayanan Administrasi Desa','informasi-pelayanan-administrasi-desa','Pelayanan','Panduan singkat pelayanan administrasi warga.','Konten contoh akan diperbarui admin desa.'),('Kerja Bakti dan Pemeliharaan Lingkungan','kerja-bakti-lingkungan','Kegiatan','Kegiatan bersama menjaga lingkungan desa.','Konten contoh akan diperbarui admin desa.');
 INSERT INTO facilities(name,category,address,description,location) SELECT 'Kantor Desa Tanjungjaya','Kantor Desa','Kecamatan Cihampelas, Bandung Barat','Posisi referensi, perlu verifikasi lapangan',ST_SRID(POINT(107.4280,-6.9248),4326) WHERE NOT EXISTS(SELECT 1 FROM facilities WHERE name='Kantor Desa Tanjungjaya');
 INSERT INTO facilities(name,category,address,description,location) SELECT 'Fasilitas Pendidikan Contoh','Pendidikan','Alamat akan diperbarui','Data contoh',ST_SRID(POINT(107.4205,-6.9195),4326) WHERE NOT EXISTS(SELECT 1 FROM facilities WHERE name='Fasilitas Pendidikan Contoh');

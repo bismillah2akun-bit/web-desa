@@ -125,8 +125,14 @@ async function updateService(req, res) {
 }
 
 async function deleteService(req, res) {
-  if (!await serviceModel.remove(req.params.id)) throw new AppError('Layanan tidak ditemukan', 404)
-  return sendSuccess(res, { message: 'Layanan berhasil dihapus' })
+  const result = await serviceModel.remove(req.params.id)
+  if (!result) throw new AppError('Layanan tidak ditemukan', 404)
+  return sendSuccess(res, {
+    data: result,
+    message: result.archived
+      ? 'Layanan diarsipkan. Pengajuan dan dokumen warga tetap tersimpan dan dapat diproses.'
+      : 'Layanan berhasil dihapus',
+  })
 }
 
 module.exports = {
