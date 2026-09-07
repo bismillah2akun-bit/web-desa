@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const newsModel = require('../models/newsAdminModel')
+const { newsDirectory } = require('../config/storage')
 const AppError = require('../utils/AppError')
 const { sendSuccess } = require('../utils/apiResponse')
 const { cleanText } = require('../utils/validation')
@@ -12,8 +13,7 @@ function slugify(value) {
 
 function removeUploadedImage(imageUrl) {
   if (!imageUrl || !imageUrl.startsWith('/uploads/news/')) return
-  const storageRoot = path.resolve(process.env.STORAGE_PATH || path.resolve(__dirname, '../../storage'))
-  const filePath = path.join(storageRoot, 'public/news', path.basename(imageUrl))
+  const filePath = path.join(newsDirectory, path.basename(imageUrl))
   fs.rmSync(filePath, { force: true })
 }
 

@@ -2,10 +2,8 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const multer = require('multer')
+const { privateDirectory, newsDirectory } = require('../config/storage')
 
-const storageRoot = path.resolve(process.env.STORAGE_PATH || path.resolve(__dirname, '../../storage'))
-const privateDirectory = path.join(storageRoot, 'private')
-const newsDirectory = path.join(storageRoot, 'public/news')
 fs.mkdirSync(privateDirectory, { recursive: true })
 fs.mkdirSync(newsDirectory, { recursive: true })
 

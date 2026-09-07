@@ -4,10 +4,10 @@ const express = require('express')
 const path = require('path')
 
 const apiRoutes = require('./routes/api')
+const { publicDirectory } = require('./config/storage')
 const { errorHandler, notFound } = require('./middleware/errorHandler')
 
 const app = express()
-const storageRoot = path.resolve(process.env.STORAGE_PATH || path.resolve(__dirname, '../storage'))
 const frontendDirectory = path.resolve(__dirname, '../public')
 
 app.disable('x-powered-by')
@@ -19,7 +19,7 @@ app.use(
 )
 app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())
-app.use('/uploads', express.static(path.join(storageRoot, 'public'), {
+app.use('/uploads', express.static(publicDirectory, {
   fallthrough: false,
   maxAge: '7d',
   immutable: true,

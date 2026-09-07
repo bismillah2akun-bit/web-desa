@@ -2,6 +2,7 @@ const crypto = require('crypto')
 const fs = require('fs/promises')
 const path = require('path')
 const applicationModel = require('../models/applicationModel')
+const { privateDirectory } = require('../config/storage')
 const serviceModel = require('../models/serviceModel')
 const AppError = require('../utils/AppError')
 const { sendSuccess } = require('../utils/apiResponse')
@@ -102,7 +103,7 @@ async function updateApplicationStatus(req, res) {
 async function downloadApplicationFile(req, res, next) {
   const file = await applicationModel.findFile(req.params.id)
   if (!file) throw new AppError('Dokumen tidak ditemukan', 404)
-  const filePath = path.resolve(__dirname, '../../storage/private', file.stored_name)
+  const filePath = path.join(privateDirectory, path.basename(file.stored_name))
   return res.download(filePath, file.original_name, (error) => {
     if (error && !res.headersSent) next(new AppError('Dokumen tidak dapat dibuka', 404))
   })
