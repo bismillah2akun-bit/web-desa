@@ -14,6 +14,7 @@ import {
   Marker,
   Popup,
   GeoJSON,
+  ScaleControl,
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
@@ -23,7 +24,6 @@ import {
   Sprout,
   Store,
   GraduationCap,
-  Building2,
   Palette,
   Clock,
   Phone,
@@ -60,11 +60,13 @@ import AdminGuestbook from "@/pages/AdminGuestbook";
 import AdminAreas from "@/pages/AdminAreas";
 import AdminOfficials from "@/pages/AdminOfficials";
 import AdminContacts from "@/pages/AdminContacts";
+import AdminPotentials from "@/pages/AdminPotentials";
 import AdminWorkspace from '@/pages/AdminWorkspace';
 import Brand from "@/components/VillageBrand";
+import boundary from "@/data/tanjungjaya-boundary.json";
+import boundarySource from "@/data/tanjungjaya-boundary-source.json";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  center = [-6.9208, 107.426],
   note = "Data akan diperbarui oleh admin desa.";
 const mediaUrl = (value) =>
   value?.startsWith("/uploads/")
@@ -88,104 +90,9 @@ const nav = [
   ["Berita", "/berita"],
   ["Kontak", "/kontak"],
 ];
-const pots = [
-  [
-    "Pertanian",
-    Sprout,
-    "Lahan pertanian dan komoditas lokal yang menjadi bagian penting ekonomi warga.",
-    pics.farm,
-  ],
-  [
-    "UMKM",
-    Store,
-    "Produk rumahan dan usaha kreatif warga yang terus bertumbuh.",
-    pics.shop,
-  ],
-  [
-    "Wisata",
-    Mountain,
-    "Bentang alam dan pengalaman desa yang dapat dikembangkan.",
-    pics.village,
-  ],
-  [
-    "Budaya",
-    Palette,
-    "Tradisi yang memperkuat identitas dan kebersamaan warga.",
-    pics.culture,
-  ],
-  [
-    "Pendidikan",
-    GraduationCap,
-    "Sarana belajar dan pengembangan generasi muda.",
-    pics.village,
-  ],
-  [
-    "Fasilitas Umum",
-    Building2,
-    "Fasilitas penunjang pelayanan dan aktivitas masyarakat.",
-    pics.shop,
-  ],
-];
-const boundary = {
-  type: "Feature",
-  properties: {
-    name: "Batas referensi visual Google Maps",
-    source: "Digitasi referensi dari tampilan Google Maps, September 2026",
-    status: "Bukan batas resmi",
-  },
-  geometry: {
-    type: "Polygon",
-    coordinates: [
-      [
-        [107.405, -6.903],
-        [107.4105, -6.9052],
-        [107.414, -6.907],
-        [107.418, -6.9062],
-        [107.421, -6.909],
-        [107.425, -6.9098],
-        [107.428, -6.9075],
-        [107.431, -6.9082],
-        [107.433, -6.9115],
-        [107.436, -6.91],
-        [107.439, -6.912],
-        [107.4425, -6.9112],
-        [107.445, -6.914],
-        [107.449, -6.9148],
-        [107.4525, -6.913],
-        [107.455, -6.9165],
-        [107.4535, -6.92],
-        [107.4555, -6.923],
-        [107.453, -6.926],
-        [107.45, -6.925],
-        [107.448, -6.928],
-        [107.445, -6.9265],
-        [107.443, -6.9305],
-        [107.44, -6.9275],
-        [107.438, -6.933],
-        [107.435, -6.93],
-        [107.432, -6.936],
-        [107.4295, -6.9315],
-        [107.426, -6.9355],
-        [107.423, -6.931],
-        [107.4195, -6.937],
-        [107.4165, -6.932],
-        [107.413, -6.9345],
-        [107.411, -6.93],
-        [107.407, -6.932],
-        [107.405, -6.928],
-        [107.401, -6.927],
-        [107.399, -6.9235],
-        [107.402, -6.921],
-        [107.398, -6.918],
-        [107.401, -6.915],
-        [107.397, -6.912],
-        [107.4015, -6.91],
-        [107.4035, -6.907],
-        [107.405, -6.903],
-      ],
-    ],
-  },
-};
+const boundaryInfo = boundary.features[0].properties;
+const boundaryBounds = L.geoJSON(boundary).getBounds();
+const boundaryFitOptions = { padding: [28, 28], maxZoom: 16 };
 const points = [
   {
     id: 1,
@@ -812,13 +719,22 @@ function PageHero({ tag, title, desc }) {
   );
 }
 function Home() {
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    fetch(`${API}/profile`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((body) => setProfile(body.data))
+      .catch(() => setProfile({}));
+  }, []);
+  const welcomeTitle = profile?.welcome_title || "Bersama membangun desa yang terbuka dan berdaya";
+  const welcomeMessage = profile?.welcome_message || "Selamat datang di portal Desa Tanjungjaya. Website ini disiapkan sebagai ruang informasi, pengenalan potensi, dan akses layanan bagi warga.";
   return (
     <Layout>
       <section className="relative min-h-[680px] overflow-hidden bg-forest-950">
         <img
-          src={pics.village}
+          src={mediaUrl(profile?.hero_image_url) || pics.village}
           className="absolute inset-0 h-full w-full object-cover opacity-35"
-          alt="Pemandangan pedesaan"
+          alt="Latar Desa Tanjungjaya"
         />
         <div className="absolute inset-y-0 left-0 w-2 bg-earth-500" />
         <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-center px-5 py-24">
@@ -851,12 +767,12 @@ function Home() {
       <section className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-2 md:items-center">
         <div className="relative">
           <img
-            src={pics.farm}
-            alt="Placeholder kepala desa"
+            src={mediaUrl(profile?.welcome_image_url) || pics.farm}
+            alt={profile?.village_head_name ? `Foto ${profile.village_head_name}` : "Foto kepala desa"}
             className="aspect-[4/3] w-full rounded-3xl object-cover"
           />
           <span className="absolute bottom-4 left-4 rounded-xl bg-white px-4 py-3 text-xs font-bold shadow-lg">
-            Foto Kepala Desa · Placeholder
+            {profile?.village_head_name ? `Kepala Desa · ${profile.village_head_name}` : "Foto Kepala Desa"}
           </span>
         </div>
         <div>
@@ -864,15 +780,13 @@ function Home() {
             Sambutan Kepala Desa
           </p>
           <h2 className="mt-4 font-serif text-4xl text-forest-950">
-            Bersama membangun desa yang terbuka dan berdaya
+            {welcomeTitle}
           </h2>
           <p className="mt-6 leading-8 text-stone-600">
-            Selamat datang di portal Desa Tanjungjaya. Website ini disiapkan
-            sebagai ruang informasi, pengenalan potensi, dan akses layanan bagi
-            warga.
+            {welcomeMessage}
           </p>
           <p className="mt-4 text-sm font-semibold text-forest-900">
-            Nama Kepala Desa — {note}
+            {profile?.village_head_name || "Nama Kepala Desa"}
           </p>
         </div>
       </section>
@@ -1081,26 +995,56 @@ function Government() {
   );
 }
 function PotentialGrid({ short }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    fetch(`${API}/potentials`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((body) => setItems(body.data || []))
+      .catch(() => setItems([]));
+  }, []);
+
+  if (items === null) {
+    return <p className="text-center text-sm text-stone-500">Memuat potensi desa...</p>;
+  }
+
+  if (!items.length) {
+    return <p className="rounded-2xl border border-dashed p-10 text-center text-sm text-stone-500">Potensi desa belum diisi oleh admin.</p>;
+  }
+
+  const iconFor = (category) => {
+    const value = String(category || "").toLowerCase();
+    if (value.includes("tani") || value.includes("kebun") || value.includes("ternak")) return Sprout;
+    if (value.includes("wisata")) return Mountain;
+    if (value.includes("budaya")) return Palette;
+    if (value.includes("pendidikan")) return GraduationCap;
+    if (value.includes("umkm") || value.includes("usaha")) return Store;
+    return MapPin;
+  };
+
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {pots.slice(0, short ? 3 : 6).map(([t, I, d, im]) => (
+      {items.slice(0, short ? 3 : 6).map((item) => {
+        const I = iconFor(item.category);
+        return (
         <article
-          key={t}
+          key={item.id}
           className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
         >
           <img
-            src={im}
-            alt={`Placeholder ${t}`}
+            src={mediaUrl(item.image_url) || pics.village}
+            alt={item.name}
             className="h-48 w-full object-cover"
           />
           <div className="p-6">
             <I className="text-earth-500" />
-            <h2 className="mt-4 text-xl font-bold">{t}</h2>
-            <p className="mt-3 text-sm leading-7 text-stone-600">{d}</p>
-            <p className="mt-4 text-xs text-stone-400">{note}</p>
+            <h2 className="mt-4 text-xl font-bold">{item.name}</h2>
+            {item.category && <p className="mt-2 text-xs font-bold uppercase tracking-[.16em] text-earth-500">{item.category}</p>}
+            <p className="mt-3 text-sm leading-7 text-stone-600">{item.description || "Potensi lokal Desa Tanjungjaya."}</p>
+            {item.address && <p className="mt-4 text-xs text-stone-400">{item.address}</p>}
           </div>
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1250,39 +1194,49 @@ function Reset() {
   const m = useMap();
   return (
     <button
-      onClick={() => m.setView(center, 14)}
+      onClick={() => m.fitBounds(boundaryBounds, boundaryFitOptions)}
       className="absolute right-3 top-3 z-[500] flex gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold shadow-lg"
     >
       <LocateFixed size={16} />
-      Lokasi awal
+      Seluruh wilayah desa
     </button>
   );
 }
 function WebMap({
-  active = { office: true, facility: true, potential: true },
+  active = { office: false, facility: false, potential: false },
   height = "640px",
 }) {
   return (
     <MapContainer
-      center={center}
-      zoom={14}
+      bounds={boundaryBounds}
+      boundsOptions={boundaryFitOptions}
       style={{ height, width: "100%" }}
       scrollWheelZoom
     >
       <TileLayer
-        attribution="&copy; OpenStreetMap contributors"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Batas: <a href="https://geoservices.big.go.id/rbi/rest/services/BATASWILAYAH/BATAS_DESAKEL_AR/MapServer/0">BIG</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <GeoJSON
         data={boundary}
         style={{
-          color: "#173d32",
-          weight: 2,
-          fillColor: "#d4e0cf",
-          fillOpacity: 0.2,
-          dashArray: "7 7",
+          color: "#b91c1c",
+          weight: 2.5,
+          fillColor: "#b91c1c",
+          fillOpacity: 0.1,
         }}
-      />
+      >
+        <Popup>
+          <div className="max-w-64 text-sm">
+            <b>Desa {boundaryInfo.NAMOBJ}</b>
+            <p>Kecamatan {boundaryInfo.WADMKC}, Kabupaten {boundaryInfo.WADMKK}</p>
+            <p>Kode desa: {boundaryInfo.KDEPUM}<br />Status BIG: {boundaryInfo.Status}</p>
+            <p>{boundaryInfo.REMARK}</p>
+            <a href={boundarySource.layerUrl} target="_blank" rel="noreferrer">Lihat sumber data BIG ↗</a>
+          </div>
+        </Popup>
+      </GeoJSON>
+      <ScaleControl position="bottomleft" imperial={false} />
       {points
         .filter((p) => active[p.type])
         .map((p) => (
@@ -1305,7 +1259,7 @@ function WebMap({
   );
 }
 function WebGIS() {
-  const [a, setA] = useState({ office: true, facility: true, potential: true });
+  const [a, setA] = useState({ office: false, facility: false, potential: false });
   return (
     <Layout>
       <PageHero
@@ -1317,13 +1271,23 @@ function WebGIS() {
         <div className="mb-5 flex gap-3 rounded-xl bg-earth-100 p-4 text-sm">
           <Info />
           <p>
-            <b>Catatan:</b> koordinat dan batas merupakan data contoh, bukan
-            batas resmi. Perbarui menggunakan data Pemerintah Desa atau BIG.
+            <b>Batas wilayah bersumber dari BIG.</b> Status data: {boundaryInfo.Status},
+            verifikasi teknis 2023. Titik fasilitas dan potensi masih berupa contoh;
+            aktifkan kategorinya jika ingin melihatnya.
           </p>
         </div>
         <div className="grid overflow-hidden rounded-2xl border border-stone-200 bg-white lg:grid-cols-[280px_1fr]">
           <aside className="border-r border-stone-200 p-5">
-            <h2 className="font-bold">Filter kategori</h2>
+            <h2 className="font-bold">Batas Desa Tanjungjaya</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-500">Kecamatan {boundaryInfo.WADMKC}<br />Kabupaten {boundaryInfo.WADMKK}</p>
+            <dl className="mt-5 space-y-3 rounded-xl bg-sage-50 p-4 text-sm">
+              <div><dt className="text-xs text-stone-500">Kode desa</dt><dd className="mt-1 font-semibold">{boundaryInfo.KDEPUM}</dd></div>
+              <div><dt className="text-xs text-stone-500">Status dalam dataset BIG</dt><dd className="mt-1 font-semibold">{boundaryInfo.Status}</dd></div>
+              <div><dt className="text-xs text-stone-500">Diambil dari sumber</dt><dd className="mt-1">7 September 2026</dd></div>
+            </dl>
+            <a href={boundarySource.layerUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-forest-900 underline underline-offset-4">Sumber data BIG <ArrowRight size={14} /></a>
+            <details className="mt-3 text-xs leading-6 text-stone-500"><summary className="cursor-pointer font-semibold">Keterangan data batas</summary><p className="mt-2">{boundaryInfo.REMARK}. Referensi peraturan belum tercantum pada dataset. Peta menampilkan geometri dari sumber, tanpa digitasi ulang.</p></details>
+            <h3 className="mt-6 border-t pt-5 text-sm font-bold">Titik lokasi contoh</h3>
             <div className="mt-5 space-y-3">
               {[
                 ["office", "Kantor Desa"],
@@ -1344,7 +1308,7 @@ function WebGIS() {
             <p className="mt-8 border-t pt-5 text-xs leading-6 text-stone-500">
               <b>Legenda</b>
               <br />
-              Garis putus-putus: batas contoh
+              Garis merah: batas wilayah dari BIG
               <br />
               Marker: titik lokasi contoh
             </p>
@@ -1711,8 +1675,13 @@ function AdminLogin() {
   const [show, setShow] = useState(false),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
+    [profile, setProfile] = useState(null),
     navigate = useNavigate();
   useEffect(() => {
+    fetch(`${API}/profile`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((body) => setProfile(body.data))
+      .catch(() => setProfile({}));
     fetch(`${API}/auth/me`, { credentials: "include" })
       .then((r) => {
         if (r.ok) navigate("/admin", { replace: true });
@@ -1745,7 +1714,7 @@ function AdminLogin() {
     <main className="grid min-h-screen bg-sage-50 lg:grid-cols-[1.05fr_.95fr]">
       <section className="relative hidden overflow-hidden bg-forest-950 lg:block">
         <img
-          src={pics.village}
+          src={mediaUrl(profile?.login_image_url) || pics.village}
           alt="Pemandangan Desa Tanjungjaya"
           className="absolute inset-0 h-full w-full object-cover opacity-35"
         />
@@ -1869,13 +1838,15 @@ function AdminContentEditor() {
     setSaving(type);
     setNotice("");
     try {
+      const formData = new FormData(e.currentTarget);
+      const isProfile = type === "profile";
       const response = await fetch(`${API}/admin/${path}`, {
           method: "PUT",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            Object.fromEntries(new FormData(e.currentTarget)),
-          ),
+          ...(isProfile ? { body: formData } : {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(Object.fromEntries(formData)),
+          }),
         }),
         json = await response.json();
       if (response.status === 401)
@@ -2024,6 +1995,31 @@ function AdminContentEditor() {
                 className="mt-2 w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-forest-900"
               />
             </label>
+            <div className="md:col-span-2 mt-2 border-t border-stone-100 pt-6">
+              <h3 className="font-bold text-forest-950">Sambutan Kepala Desa</h3>
+              <p className="mt-1 text-xs text-stone-500">Konten tunggal ini hanya dapat diedit. Tidak tersedia tombol hapus.</p>
+            </div>
+            <Field label="Judul sambutan" name="welcome_title" defaultValue={profile.welcome_title || ""} />
+            <Field label="Nama kepala desa" name="village_head_name" defaultValue={profile.village_head_name || ""} />
+            <label className="md:col-span-2">
+              <span className="text-sm font-semibold">Isi sambutan</span>
+              <textarea name="welcome_message" rows="5" defaultValue={profile.welcome_message || ""} className="mt-2 w-full rounded-xl border border-stone-300 p-3 outline-none focus:border-forest-900" />
+            </label>
+            <label className="md:col-span-2">
+              <span className="text-sm font-semibold">Foto kepala desa</span>
+              <input type="file" name="welcome_image" accept="image/jpeg,image/png,image/webp" className="mt-2 w-full rounded-xl border border-stone-300 p-3" />
+              {profile.welcome_image_url && <small className="mt-2 block text-xs text-stone-500">Foto saat ini tersimpan. Pilih file baru untuk menggantinya.</small>}
+            </label>
+            <label className="md:col-span-2">
+              <span className="text-sm font-semibold">Foto latar halaman paling atas</span>
+              <input type="file" name="hero_image" accept="image/jpeg,image/png,image/webp" className="mt-2 w-full rounded-xl border border-stone-300 p-3" />
+              {profile.hero_image_url && <small className="mt-2 block text-xs text-stone-500">Foto latar saat ini tersimpan. Pilih file baru untuk menggantinya.</small>}
+            </label>
+            <label className="md:col-span-2">
+              <span className="text-sm font-semibold">Foto halaman login admin</span>
+              <input type="file" name="login_image" accept="image/jpeg,image/png,image/webp" className="mt-2 w-full rounded-xl border border-stone-300 p-3" />
+              {profile.login_image_url && <small className="mt-2 block text-xs text-stone-500">Foto login saat ini tersimpan. Pilih file baru untuk menggantinya.</small>}
+            </label>
           </div>
           <button
             disabled={saving === "profile"}
@@ -2093,8 +2089,8 @@ function AdminContentEditor() {
 }
 function AdminDashboard() {
   const { pathname } = useLocation();
-  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
-  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, profile: AdminContentEditor, officials: AdminOfficials }} />;
+  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/potensi': 'potentials', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
+  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, potentials: AdminPotentials, profile: AdminContentEditor, officials: AdminOfficials }} />;
 }
 function App() {
   return (
@@ -2115,6 +2111,7 @@ function App() {
         <Route path="/admin/profil" element={<AdminDashboard />} />
         <Route path="/admin/layanan" element={<AdminDashboard />} />
         <Route path="/admin/berita" element={<AdminDashboard />} />
+        <Route path="/admin/potensi" element={<AdminDashboard />} />
         <Route path="/admin/pengajuan" element={<AdminDashboard />} />
         <Route path="/admin/buku-tamu" element={<AdminDashboard />} />
         <Route path="/admin/pesan" element={<AdminDashboard />} />

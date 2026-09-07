@@ -11,7 +11,7 @@ const newsAdminController = require('../controllers/newsAdminController')
 const submissionController = require('../controllers/submissionController')
 const serviceController = require('../controllers/serviceController')
 const { requireAuth } = require('../middleware/auth')
-const { applicationUpload, newsImageUpload } = require('../middleware/upload')
+const { applicationUpload, newsImageUpload, potentialImageUpload, profileImageUpload } = require('../middleware/upload')
 const asyncHandler = require('../utils/asyncHandler')
 const { sendSuccess } = require('../utils/apiResponse')
 
@@ -44,7 +44,11 @@ router.get('/auth/me', requireAuth, authController.me)
 router.post('/auth/logout', authController.logout)
 
 router.get('/admin/dashboard', requireAuth, asyncHandler(dashboardController.getDashboard))
-router.put('/admin/profile', requireAuth, asyncHandler(adminContentController.updateProfile))
+router.put('/admin/profile', requireAuth, profileImageUpload.fields([
+  { name: 'welcome_image', maxCount: 1 },
+  { name: 'hero_image', maxCount: 1 },
+  { name: 'login_image', maxCount: 1 },
+]), asyncHandler(adminContentController.updateProfile))
 router.put('/admin/demographics', requireAuth, asyncHandler(adminContentController.updateDemographics))
 router.get('/admin/officials', requireAuth, asyncHandler(governmentOfficialController.getAll))
 router.post('/admin/officials', requireAuth, asyncHandler(governmentOfficialController.create))
@@ -53,6 +57,9 @@ router.delete('/admin/officials/:id', requireAuth, asyncHandler(governmentOffici
 router.post('/admin/demographics/areas', requireAuth, asyncHandler(adminContentController.createArea))
 router.put('/admin/demographics/areas/:id', requireAuth, asyncHandler(adminContentController.updateArea))
 router.delete('/admin/demographics/areas/:id', requireAuth, asyncHandler(adminContentController.deleteArea))
+router.post('/admin/potentials', requireAuth, potentialImageUpload.single('image'), asyncHandler(adminContentController.createPotential))
+router.put('/admin/potentials/:id', requireAuth, potentialImageUpload.single('image'), asyncHandler(adminContentController.updatePotential))
+router.delete('/admin/potentials/:id', requireAuth, asyncHandler(adminContentController.deletePotential))
 router.get('/admin/services', requireAuth, asyncHandler(serviceController.getAdminServices))
 router.post('/admin/services', requireAuth, asyncHandler(serviceController.createService))
 router.get('/admin/services/:id', requireAuth, asyncHandler(serviceController.getService))

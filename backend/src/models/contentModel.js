@@ -21,7 +21,8 @@ async function updateVillageProfile(profile) {
     `UPDATE village_profile
      SET name = ?, district = ?, regency = ?, province = ?, postal_code = ?,
          area_size_ha = ?, hamlet_count = ?, boundary_north = ?, boundary_east = ?,
-         boundary_south = ?, boundary_west = ?, history = ?, vision = ?, mission = ?
+         boundary_south = ?, boundary_west = ?, history = ?, vision = ?, mission = ?,
+         welcome_title = ?, welcome_message = ?, village_head_name = ?, welcome_image_url = ?, hero_image_url = ?, login_image_url = ?
      WHERE id = ?`,
     [
       profile.name,
@@ -38,6 +39,12 @@ async function updateVillageProfile(profile) {
       profile.history,
       profile.vision,
       profile.mission,
+      profile.welcomeTitle,
+      profile.welcomeMessage,
+      profile.villageHeadName,
+      profile.welcomeImageUrl,
+      profile.heroImageUrl,
+      profile.loginImageUrl,
       profile.id,
     ],
   )
@@ -61,6 +68,37 @@ async function findSpatialRecords(table) {
 
   const [rows] = await db.query(`SELECT ${SPATIAL_COLUMNS} FROM ${table} ORDER BY id`)
   return rows
+}
+
+async function createPotential(potential) {
+  const [result] = await db.execute(
+    `INSERT INTO potentials
+      (name, category, address, description, image_url, location)
+     VALUES (?, ?, ?, ?, ?, ST_SRID(POINT(?, ?), 4326))`,
+    [potential.name, potential.category, potential.address, potential.description,
+      potential.imageUrl, potential.longitude, potential.latitude],
+  )
+  const [rows] = await db.execute(`SELECT ${SPATIAL_COLUMNS} FROM potentials WHERE id = ?`, [result.insertId])
+  return rows[0]
+}
+
+async function updatePotential(id, potential) {
+  const [result] = await db.execute(
+    `UPDATE potentials
+     SET name = ?, category = ?, address = ?, description = ?, image_url = ?,
+         location = ST_SRID(POINT(?, ?), 4326)
+     WHERE id = ?`,
+    [potential.name, potential.category, potential.address, potential.description,
+      potential.imageUrl, potential.longitude, potential.latitude, id],
+  )
+  if (!result.affectedRows) return null
+  const [rows] = await db.execute(`SELECT ${SPATIAL_COLUMNS} FROM potentials WHERE id = ?`, [id])
+  return rows[0]
+}
+
+async function deletePotential(id) {
+  const [result] = await db.execute('DELETE FROM potentials WHERE id = ?', [id])
+  return result.affectedRows > 0
 }
 
 async function findDemographics() {
@@ -168,6 +206,9 @@ module.exports = {
   findAllNews,
   findNewsById,
   findSpatialRecords,
+  createPotential,
+  updatePotential,
+  deletePotential,
   findDemographics,
   updateDemographicSummary,
   createAdministrativeArea,

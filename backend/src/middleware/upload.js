@@ -2,10 +2,12 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const multer = require('multer')
-const { privateDirectory, newsDirectory } = require('../config/storage')
+const { privateDirectory, newsDirectory, potentialsDirectory, profileDirectory } = require('../config/storage')
 
 fs.mkdirSync(privateDirectory, { recursive: true })
 fs.mkdirSync(newsDirectory, { recursive: true })
+fs.mkdirSync(potentialsDirectory, { recursive: true })
+fs.mkdirSync(profileDirectory, { recursive: true })
 
 const storage = multer.diskStorage({
   destination: (_req, _file, callback) => callback(null, privateDirectory),
@@ -46,4 +48,42 @@ const newsImageUpload = multer({
   },
 })
 
-module.exports = { applicationUpload, newsImageUpload }
+const potentialImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, potentialsDirectory),
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase()
+      callback(null, `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${extension}`)
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!new Set(['image/jpeg', 'image/png', 'image/webp']).has(file.mimetype)) {
+      const error = new Error('Gambar harus berformat JPG, PNG, atau WEBP')
+      error.status = 400
+      return callback(error)
+    }
+    return callback(null, true)
+  },
+})
+
+const profileImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, profileDirectory),
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase()
+      callback(null, `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${extension}`)
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 3 },
+  fileFilter: (_req, file, callback) => {
+    if (!new Set(['image/jpeg', 'image/png', 'image/webp']).has(file.mimetype)) {
+      const error = new Error('Gambar harus berformat JPG, PNG, atau WEBP')
+      error.status = 400
+      return callback(error)
+    }
+    return callback(null, true)
+  },
+})
+
+module.exports = { applicationUpload, newsImageUpload, potentialImageUpload, profileImageUpload }

@@ -58,6 +58,7 @@
 .admin-record__avatar { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border: 1px solid #dee9f7; border-radius: 12px; background: #edf4ff; color: #5075a8; font-size: 12px; font-weight: 600; }
 .admin-record__avatar[data-tone="amber"] { background: #faf3e9; border-color: #f2e7d6; color: #a27d43; }
 .admin-record__avatar[data-tone="purple"] { background: #f2eff9; border-color: #e9e3f5; color: #8268ac; }
+.admin-record__avatar[data-tone="red"] { background: #fff0ed; border-color: #f4d2cc; color: #b51f16; }
 .admin-record > div { min-width: 0; max-width: 245px; }
 .admin-record strong { display: block; color: #28374d; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .admin-record > div > span { display: block; margin-top: 3px; color: #7b8797; font-size: 12px; overflow-wrap: anywhere; }

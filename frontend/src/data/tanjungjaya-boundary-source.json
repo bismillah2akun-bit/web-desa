@@ -1,0 +1,8 @@
+{
+  "provider": "Badan Informasi Geospasial (BIG)",
+  "layerUrl": "https://geoservices.big.go.id/rbi/rest/services/BATASWILAYAH/BATAS_DESAKEL_AR/MapServer/0",
+  "queryUrl": "https://geoservices.big.go.id/rbi/rest/services/BATASWILAYAH/BATAS_DESAKEL_AR/MapServer/0/query?where=KDEPUM+%3D+%2732.17.10.2010%27&outFields=*&returnGeometry=true&outSR=4326&f=geojson",
+  "retrievedAt": "2026-09-07",
+  "coordinateReferenceSystem": "EPSG:4326",
+  "note": "Disalin langsung dari layanan BIG tanpa digitasi ulang atau penyederhanaan geometri. Status mengikuti atribut sumber; referensi peraturan (UUPP) kosong."
+}

@@ -49,6 +49,22 @@ async function initializeDatabase() {
     }
     await pool.query('ALTER TABLE service_requirements DROP INDEX uq_service_requirement_field')
   }
+  const profileColumns = [
+    ['welcome_title', 'VARCHAR(255) NULL'],
+    ['welcome_message', 'TEXT NULL'],
+    ['village_head_name', 'VARCHAR(180) NULL'],
+    ['welcome_image_url', 'TEXT NULL'],
+    ['hero_image_url', 'TEXT NULL'],
+    ['login_image_url', 'TEXT NULL'],
+  ]
+  for (const [name, definition] of profileColumns) {
+    const [profileColumn] = await pool.query(`SHOW COLUMNS FROM village_profile LIKE '${name}'`)
+    if (!profileColumn.length) await pool.query(`ALTER TABLE village_profile ADD COLUMN ${name} ${definition}`)
+  }
+  await pool.query(`UPDATE village_profile
+    SET welcome_title = COALESCE(NULLIF(welcome_title, ''), 'Bersama membangun desa yang terbuka dan berdaya'),
+        welcome_message = COALESCE(NULLIF(welcome_message, ''), 'Selamat datang di portal Desa Tanjungjaya. Website ini disiapkan sebagai ruang informasi, pengenalan potensi, dan akses layanan bagi warga.')
+    WHERE id = (SELECT id FROM (SELECT id FROM village_profile ORDER BY id LIMIT 1) AS current_profile)`)
 }
 
 module.exports = { pool, testConnection, initializeDatabase }
