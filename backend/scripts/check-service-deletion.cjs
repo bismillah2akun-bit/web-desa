@@ -40,6 +40,19 @@ async function run() {
   } })
   assert.equal(application.status, 201)
   applicationIds.push(application.body.data.id)
+  const previousRequirementId = used.requirements[0].id
+  const edited = await call(`/admin/services/${used.id}`, { method: 'PUT', data: {
+    name: used.name + ' updated', estimated_days: 3, is_active: true,
+    description: 'Edited after an application existed',
+    requirements: [{ label: 'Updated note', field_type: 'textarea', is_required: true }],
+  } })
+  assert.equal(edited.status, 200)
+  assert.equal(edited.body.data.requirements[0].label, 'Updated note')
+  assert.notEqual(edited.body.data.requirements[0].id, previousRequirementId)
+  const preserved = await call(`/admin/applications/${application.body.data.id}`)
+  assert.equal(preserved.status, 200)
+  assert.equal(preserved.body.data.values[0].label, 'Test note')
+  assert.equal(preserved.body.data.values[0].value_text, 'Preserved value')
   const archived = await call(`/admin/services/${used.id}`, { method: 'DELETE' })
   assert.equal(archived.status, 200)
   assert.equal(archived.body.data.archived, true)

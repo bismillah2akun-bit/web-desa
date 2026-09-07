@@ -38,6 +38,7 @@ const navigation = [
   ["services", "Layanan desa", Settings2, "Atur layanan dan persyaratannya"],
   ["news", "Kabar & informasi", Newspaper, "Kelola berita untuk masyarakat"],
   ["guestbook", "Buku tamu", BookOpen, "Catatan kunjungan ke kantor desa"],
+  ["contacts", "Pesan warga", Mail, "Baca dan tindak lanjuti pesan masuk"],
   ["officials", "Perangkat desa", Users, "Kelola struktur pemerintahan"],
   [
     "profile",
@@ -312,16 +313,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
                   type="button"
                   key={key}
                   className="admin-stat"
-                  onClick={() =>
-                    key === "contacts"
-                      ? document
-                          .getElementById("admin-contacts")
-                          ?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          })
-                      : selectPanel(key)
-                  }
+                  onClick={() => selectPanel(key)}
                 >
                   <div>
                     <span className="admin-stat__icon">
@@ -372,6 +364,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
                 items={summary?.recentContacts || []}
                 empty="Belum ada pesan masuk."
                 id="admin-contacts"
+                onView={() => selectPanel("contacts")}
               />
             </section>
             <footer className="admin-overview-footer">
@@ -395,7 +388,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
                     <p>{navigation.find(([id]) => id === key)?.[3]}</p>
                   </div>
                   <div className="admin-embedded">
-                    <Panel />
+                    <Panel onDataChanged={reload} />
                   </div>
                 </div>
               ) : null;

@@ -17,7 +17,7 @@ async function findAll({ includeInactive = false } = {}) {
   const placeholders = ids.map(() => '?').join(', ')
   const [requirements] = await db.query(
     `SELECT * FROM service_requirements
-     WHERE service_type_id IN (${placeholders})
+     WHERE service_type_id IN (${placeholders}) AND is_active = TRUE
      ORDER BY service_type_id, sort_order, id`,
     ids,
   )
@@ -97,7 +97,17 @@ async function update(id, service) {
       return null
     }
 
-    await connection.execute('DELETE FROM service_requirements WHERE service_type_id = ?', [id])
+    const [applications] = await connection.execute(
+      'SELECT id FROM service_applications WHERE service_type_id = ? LIMIT 1', [id],
+    )
+    if (applications.length) {
+      await connection.execute(
+        'UPDATE service_requirements SET is_active = FALSE WHERE service_type_id = ? AND is_active = TRUE',
+        [id],
+      )
+    } else {
+      await connection.execute('DELETE FROM service_requirements WHERE service_type_id = ?', [id])
+    }
     for (const requirement of service.requirements) {
       await connection.execute(
         `INSERT INTO service_requirements

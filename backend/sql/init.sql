@@ -41,9 +41,10 @@ CREATE TABLE IF NOT EXISTS service_requirements (
   accepted_formats VARCHAR(255),
   max_file_size_mb INT UNSIGNED,
   sort_order INT UNSIGNED DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_service_requirement_type FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_service_requirement_field (service_type_id, field_name)
+  INDEX idx_service_requirements_type (service_type_id),
+  CONSTRAINT fk_service_requirement_type FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS service_applications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

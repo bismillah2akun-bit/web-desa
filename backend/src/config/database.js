@@ -37,6 +37,18 @@ async function initializeDatabase() {
   if (!columns.length) {
     await pool.query('ALTER TABLE service_types ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL')
   }
+  const [requirementColumns] = await pool.query("SHOW COLUMNS FROM service_requirements LIKE 'is_active'")
+  if (!requirementColumns.length) {
+    await pool.query('ALTER TABLE service_requirements ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
+  }
+  const [requirementIndexes] = await pool.query("SHOW INDEX FROM service_requirements WHERE Key_name = 'uq_service_requirement_field'")
+  if (requirementIndexes.length) {
+    const [typeIndexes] = await pool.query("SHOW INDEX FROM service_requirements WHERE Key_name = 'idx_service_requirements_type'")
+    if (!typeIndexes.length) {
+      await pool.query('ALTER TABLE service_requirements ADD INDEX idx_service_requirements_type (service_type_id)')
+    }
+    await pool.query('ALTER TABLE service_requirements DROP INDEX uq_service_requirement_field')
+  }
 }
 
 module.exports = { pool, testConnection, initializeDatabase }

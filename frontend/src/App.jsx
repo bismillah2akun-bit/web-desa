@@ -59,6 +59,7 @@ import TrackApplication from "@/pages/TrackApplication";
 import AdminGuestbook from "@/pages/AdminGuestbook";
 import AdminAreas from "@/pages/AdminAreas";
 import AdminOfficials from "@/pages/AdminOfficials";
+import AdminContacts from "@/pages/AdminContacts";
 import AdminWorkspace from '@/pages/AdminWorkspace';
 import Brand from "@/components/VillageBrand";
 
@@ -2092,8 +2093,8 @@ function AdminContentEditor() {
 }
 function AdminDashboard() {
   const { pathname } = useLocation();
-  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
-  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, applications: AdminApplications, news: AdminNews, services: AdminServices, profile: AdminContentEditor, officials: AdminOfficials }} />;
+  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
+  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, profile: AdminContentEditor, officials: AdminOfficials }} />;
 }
 function App() {
   return (
@@ -2116,6 +2117,7 @@ function App() {
         <Route path="/admin/berita" element={<AdminDashboard />} />
         <Route path="/admin/pengajuan" element={<AdminDashboard />} />
         <Route path="/admin/buku-tamu" element={<AdminDashboard />} />
+        <Route path="/admin/pesan" element={<AdminDashboard />} />
         <Route path="/admin/perangkat-desa" element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
