@@ -35,7 +35,7 @@ function whatsappUrl(application) {
   const note = application.admin_note
     ? `\n\nCatatan petugas:\n${application.admin_note}`
     : "";
-  const message = `Halo ${application.full_name}, pengajuan ${application.service_name} dengan kode ${application.tracking_code} ${status}.${note}\n\nSilakan cek status melalui website Desa Tanjungjaya.`;
+  const message = `Halo ${application.full_name}, pengajuan ${application.service_name} dengan kode ${application.tracking_code} ${status}.${note}\n\nSilakan cek status melalui website Desa Tanjungjaya dan silakan datang ke Kantor Desa Tanjungjaya untuk proses selanjutnya.`;
 
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
