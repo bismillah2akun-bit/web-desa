@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Download, Search, Trash2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import Brand from "@/components/VillageBrand";
+import { useEffect, useState } from "react";
+import { Download, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import AdminDataTable, { RecordIdentity } from "@/components/AdminDataTable";
 import { useConfirm } from '@/components/confirmContext';
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -33,7 +33,7 @@ async function downloadExport() {
 export default function AdminGuestbook({ onDataChanged }) {
   const confirm = useConfirm();
   const [items, setItems] = useState([]);
-  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
 
@@ -45,20 +45,9 @@ export default function AdminGuestbook({ onDataChanged }) {
         if (!response.ok) throw new Error("Buku tamu belum dapat dimuat");
         setItems((await response.json()).data);
       })
-      .catch((error) => setNotice(error.message));
+      .catch((error) => setNotice(error.message))
+      .finally(() => setLoading(false));
   }, [navigate]);
-
-  const filtered = useMemo(() => {
-    const keyword = query.toLowerCase();
-    return items.filter((item) =>
-      [item.name, item.institution, item.visit_purpose, item.email].some(
-        (value) =>
-          String(value || "")
-            .toLowerCase()
-            .includes(keyword),
-      ),
-    );
-  }, [items, query]);
 
   async function changeStatus(id, status) {
     try {
@@ -90,145 +79,30 @@ export default function AdminGuestbook({ onDataChanged }) {
     } });
   }
 
+  const columns = [
+    { key: "name", label: "Pengunjung", sortValue: (item) => item.name, className: "admin-data-person", render: (item) => <RecordIdentity name={item.name} subtitle={item.institution || "Pengunjung umum"} tone="amber" /> },
+    { key: "purpose", label: "Tujuan kunjungan", sortValue: (item) => item.visit_purpose, className: "admin-data-text", render: (item) => <strong className="admin-cell-title">{item.visit_purpose}</strong> },
+    { key: "date", label: "Tanggal kunjungan", sortValue: (item) => item.visit_date, className: "admin-data-date", render: (item) => <><strong className="admin-cell-title">{new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(item.visit_date))}</strong><span className="admin-cell-meta">Dicatat {formatTime(item.created_at)}</span></> },
+    { key: "status", label: "Status", sortValue: (item) => item.status, render: (item) => <select className="admin-status-select" data-status={item.status} aria-label={`Status kunjungan ${item.name}`} value={item.status} onChange={(event) => changeStatus(item.id, event.target.value)}><option value="baru">Baru</option><option value="dibaca">Dibaca</option><option value="selesai">Selesai</option></select> },
+    { key: "actions", label: "Aksi", className: "admin-data-actions", render: (item) => <button type="button" onClick={() => remove(item)} aria-label={`Hapus kunjungan ${item.name}`} title="Hapus kunjungan" className="admin-row-action admin-row-action--danger"><Trash2 size={16} /></button> },
+  ];
+
   return (
     <main className="min-h-screen bg-sage-50">
-      <header className="border-b border-sage-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Brand />
-          <Link
-            to="/admin"
-            className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold"
-          >
-            <ArrowLeft size={16} />
-            Dashboard
-          </Link>
-        </div>
-      </header>
-      {notice && (
-        <div role="status" className="fixed bottom-5 right-5 z-50 rounded-xl border bg-white px-5 py-4 text-sm font-semibold shadow-xl">
-          {notice}
-        </div>
-      )}
+      {notice && <div role="status" className="fixed bottom-5 right-5 z-50 rounded-xl border bg-white px-5 py-4 text-sm font-semibold shadow-xl">{notice}</div>}
       <div className="mx-auto max-w-7xl px-5 py-10">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.2em] text-earth-500">
-              Administrasi Kunjungan
-            </p>
-            <h1 className="mt-3 font-serif text-4xl text-forest-950">
-              Data buku tamu
-            </h1>
-            <p className="mt-2 text-sm text-stone-500">
-              {items.length} kunjungan tersimpan.
-            </p>
-          </div>
-          <button
-            onClick={() =>
-              downloadExport().catch((error) => setNotice(error.message))
-            }
-            className="flex w-fit items-center gap-2 rounded-xl bg-forest-900 px-4 py-3 text-sm font-bold text-white"
-          >
-            <Download size={17} />
-            Export semua data Excel
-          </button>
-        </div>
-        <label className="relative mt-7 block max-w-md">
-          <Search
-            size={17}
-            className="absolute left-3 top-3.5 text-stone-400"
-          />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cari nama, instansi, tujuan..."
-            className="w-full rounded-xl border bg-white py-3 pl-10 pr-3"
-          />
-        </label>
-        <div className="mt-6 overflow-hidden rounded-2xl border border-sage-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-left text-sm">
-              <thead className="bg-forest-900 text-white">
-                <tr>
-                  {[
-                    "Waktu WIB",
-                    "Nama / Instansi",
-                    "Kontak",
-                    "Tujuan",
-                    "Pesan",
-                    "Tanggal Kunjungan",
-                    "Status",
-                    "Aksi",
-                  ].map((title) => (
-                    <th key={title} className="px-4 py-4 font-semibold">
-                      {title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filtered.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-sage-50">
-                    <td className="whitespace-nowrap px-4 py-4 text-xs text-stone-500">
-                      {formatTime(item.created_at)}
-                    </td>
-                    <td className="px-4 py-4">
-                      <b className="text-forest-950">{item.name}</b>
-                      <p className="mt-1 text-xs text-stone-500">
-                        {item.institution || "Tanpa instansi"}
-                      </p>
-                      <p className="mt-1 max-w-52 text-xs text-stone-400">
-                        {item.address}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p>{item.phone || "—"}</p>
-                      <p className="mt-1 text-xs text-stone-500">
-                        {item.email || "—"}
-                      </p>
-                    </td>
-                    <td className="max-w-60 px-4 py-4">{item.visit_purpose}</td>
-                    <td className="max-w-60 px-4 py-4 text-stone-500">
-                      {item.message || "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4">
-                      {new Intl.DateTimeFormat("id-ID", {
-                        dateStyle: "medium",
-                        timeZone: "Asia/Jakarta",
-                      }).format(new Date(item.visit_date))}
-                    </td>
-                    <td className="px-4 py-4">
-                      <select
-                        aria-label={`Status kunjungan ${item.name}`}
-                        value={item.status}
-                        onChange={(event) =>
-                          changeStatus(item.id, event.target.value)
-                        }
-                        className="rounded-lg border bg-white px-2 py-2 text-xs font-semibold"
-                      >
-                        <option value="baru">Baru</option>
-                        <option value="dibaca">Dibaca</option>
-                        <option value="selesai">Selesai</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-4">
-                      <button type="button" onClick={() => remove(item)} aria-label={`Hapus kunjungan ${item.name}`} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"><Trash2 size={16} />Hapus</button>
-                    </td>
-                  </tr>
-                ))}
-                {!filtered.length && (
-                  <tr>
-                    <td
-                      colSpan="8"
-                      className="px-5 py-12 text-center text-stone-500"
-                    >
-                      Data tidak ditemukan.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AdminDataTable
+          title="Data buku tamu"
+          description="Kelola kunjungan dan buka detail untuk melihat kontak serta catatan tamu."
+          rows={items} columns={columns} loading={loading}
+          searchText={(item) => [item.name, item.institution, item.visit_purpose, item.email, item.phone, item.message, item.address].join(" ")}
+          searchPlaceholder="Cari nama, instansi, atau tujuan…"
+          filters={[{ value: "baru", label: "Baru" }, { value: "dibaca", label: "Dibaca" }, { value: "selesai", label: "Selesai" }]}
+          defaultSort={{ key: "date", direction: "desc" }}
+          emptyMessage="Belum ada kunjungan tercatat"
+          actions={<button type="button" className="admin-table-button" onClick={() => downloadExport().catch((error) => setNotice(error.message))}><Download size={16} />Ekspor semua data</button>}
+          renderDetail={(item) => <dl className="admin-detail-grid"><div><dt>Telepon</dt><dd>{item.phone || "—"}</dd></div><div><dt>Email</dt><dd>{item.email || "—"}</dd></div><div><dt>Alamat asal</dt><dd>{item.address || "—"}</dd></div><div className="admin-detail-wide"><dt>Pesan atau catatan</dt><dd>{item.message || "Tidak ada catatan tambahan."}</dd></div></dl>}
+        />
       </div>
     </main>
   );

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Edit3, Plus, Save, Trash2, X } from "lucide-react";
+import { Edit3, Save, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/components/confirmContext";
+
+import AdminDataTable, { StatusBadge } from "@/components/AdminDataTable";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const empty = {
@@ -18,6 +20,7 @@ const empty = {
 export default function AdminAreas() {
   const confirm = useConfirm();
   const [areas, setAreas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState("");
@@ -26,9 +29,10 @@ export default function AdminAreas() {
 
   useEffect(() => {
     fetch(`${API}/demographics`)
-      .then((response) => response.json())
+      .then((response) => { if (!response.ok) throw new Error("Data belum dapat dimuat"); return response.json(); })
       .then((body) => setAreas(body.data?.areas || []))
-      .catch(() => setNotice("Data RT/RW belum dapat dimuat"));
+      .catch(() => setNotice("Data RT/RW belum dapat dimuat"))
+      .finally(() => setLoading(false));
   }, []);
 
   function change(name, value) {
@@ -117,6 +121,15 @@ export default function AdminAreas() {
       ? "—"
       : Number(value).toLocaleString("id-ID");
 
+  const columns = [
+    { key: "area", label: "Wilayah", sortValue: (area) => `${area.rw_number}/${area.rt_number}`, render: (area) => <div className="admin-area-label"><strong>RW {area.rw_number}</strong><span>RT {area.rt_number}</span></div> },
+    ...[["household_count", "KK"], ["male_population", "Laki-laki"], ["female_population", "Perempuan"]].map(([key, label]) => ({ key, label, className: "admin-data-number", sortValue: (area) => area[key] == null ? null : Number(area[key]), render: (area) => total(area[key]) })),
+    { key: "total", label: "Penduduk", className: "admin-data-number", sortValue: (area) => area.male_population == null && area.female_population == null ? null : Number(area.male_population || 0) + Number(area.female_population || 0), render: (area) => <strong>{area.male_population == null && area.female_population == null ? "—" : total(Number(area.male_population || 0) + Number(area.female_population || 0))}</strong> },
+    { key: "year", label: "Tahun", className: "admin-data-number", sortValue: (area) => area.data_year, render: (area) => area.data_year || "—" },
+    { key: "status", label: "Verifikasi", sortValue: (area) => area.status, render: (area) => <StatusBadge value={area.status}>{area.status === "terverifikasi" ? "Terverifikasi" : "Belum diverifikasi"}</StatusBadge> },
+    { key: "actions", label: "Aksi", className: "admin-data-actions", render: (area) => <div className="admin-row-actions"><button type="button" aria-label={`Edit RW ${area.rw_number} RT ${area.rt_number}`} title="Edit rekap" className="admin-row-action" onClick={() => { edit(area); document.getElementById("admin-area-form")?.scrollIntoView({ behavior: "instant", block: "center" }); }}><Edit3 size={16} /></button><button type="button" aria-label={`Hapus RW ${area.rw_number} RT ${area.rt_number}`} title="Hapus rekap" className="admin-row-action admin-row-action--danger" onClick={() => remove(area)}><Trash2 size={16} /></button></div> },
+  ];
+
   return (
     <section className="mt-7 rounded-2xl border border-sage-200 bg-white p-6 md:p-8">
       {notice && (
@@ -140,7 +153,7 @@ export default function AdminAreas() {
           {areas.length} baris data
         </span>
       </div>
-      <form onSubmit={submit} className="mt-7 rounded-2xl bg-sage-50 p-5">
+      <form id="admin-area-form" onSubmit={submit} className="mt-7 rounded-2xl bg-sage-50 p-5">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {fields.map(([label, name]) => (
             <label key={name}>
@@ -202,87 +215,14 @@ export default function AdminAreas() {
           )}
         </div>
       </form>
-      <div className="mt-7 overflow-hidden rounded-xl border">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left text-sm">
-            <thead className="bg-forest-900 text-white">
-              <tr>
-                {[
-                  "RW",
-                  "RT",
-                  "KK",
-                  "Laki-laki",
-                  "Perempuan",
-                  "Total",
-                  "Tahun",
-                  "Status",
-                  "Aksi",
-                ].map((title) => (
-                  <th key={title} className="px-4 py-3">
-                    {title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {areas.map((area) => (
-                <tr key={area.id}>
-                  <td className="px-4 py-3 font-bold">{area.rw_number}</td>
-                  <td className="px-4 py-3 font-bold">{area.rt_number}</td>
-                  <td className="px-4 py-3">{total(area.household_count)}</td>
-                  <td className="px-4 py-3">{total(area.male_population)}</td>
-                  <td className="px-4 py-3">{total(area.female_population)}</td>
-                  <td className="px-4 py-3 font-bold">
-                    {area.male_population == null &&
-                    area.female_population == null
-                      ? "—"
-                      : total(
-                          Number(area.male_population || 0) +
-                            Number(area.female_population || 0),
-                        )}
-                  </td>
-                  <td className="px-4 py-3">{area.data_year || "—"}</td>
-                  <td className="px-4 py-3 text-xs">
-                    {area.status === "terverifikasi"
-                      ? "Terverifikasi"
-                      : "Belum diverifikasi"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => edit(area)}
-                        type="button"
-                        aria-label="Edit"
-                        className="rounded-lg border p-2"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={() => remove(area)}
-                        type="button"
-                        aria-label="Hapus"
-                        className="rounded-lg border border-red-200 p-2 text-red-700"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!areas.length && (
-                <tr>
-                  <td
-                    colSpan="9"
-                    className="px-5 py-10 text-center text-stone-500"
-                  >
-                    <Plus className="mx-auto mb-3" />
-                    Belum ada rincian RT/RW.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="mt-7">
+        <AdminDataTable title="Data wilayah" description="Rekap keluarga dan penduduk untuk setiap RT/RW."
+          rows={areas} columns={columns} loading={loading}
+          searchText={(area) => [`RW ${area.rw_number}`, `RT ${area.rt_number}`, area.data_year, area.source].join(" ")}
+          searchPlaceholder="Cari RT, RW, atau tahun…"
+          filters={[{ value: "terverifikasi", label: "Terverifikasi" }, { value: "belum_diverifikasi", label: "Belum diverifikasi" }]}
+          defaultSort={{ key: "area", direction: "asc" }} emptyMessage="Belum ada rincian RT/RW"
+        />
       </div>
     </section>
   );

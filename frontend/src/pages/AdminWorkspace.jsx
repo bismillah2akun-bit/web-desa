@@ -122,6 +122,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
   }
   const counts = summary?.counts || {};
   const selected = navigation.find(([key]) => key === active) || navigation[0];
+  const PageIcon = selected[2];
   const stats = [
     [
       "Pengajuan aktif",
@@ -174,9 +175,9 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
       <aside className="admin-sidebar">
         <div className="admin-sidebar__brand">
           <Brand />
-          <span>RUANG ADMINISTRASI</span>
+          <span>Ruang administrasi</span>
         </div>
-        <p className="admin-sidebar__label">MENU UTAMA</p>
+        <p className="admin-sidebar__label">Ruang kerja</p>
         <nav aria-label="Menu administrasi">
           {navigation.map(([key, label, Icon]) => (
             <button
@@ -185,7 +186,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
               aria-current={active === key ? "page" : undefined}
               onClick={() => selectPanel(key)}
             >
-              <Icon size={19} />
+              <span className={`admin-nav-icon admin-nav-icon--${key}`}><Icon size={17} strokeWidth={1.8} /></span>
               <span>{label}</span>
               {key === "applications" &&
                 counts.active_application_count > 0 && (
@@ -217,20 +218,26 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
             >
               {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
-            <div>
-              <p>
-                Administrasi <span>/</span> {selected[1]}
-              </p>
-              <small>Desa Tanjungjaya · Bandung Barat</small>
+            <span className="admin-topbar__page-icon" aria-hidden="true">
+              <PageIcon size={22} strokeWidth={1.7} />
+            </span>
+            <div className="admin-topbar__heading">
+              <small>Desa Tanjungjaya <span> / Administrasi</span></small>
+              <p>{selected[1]}</p>
             </div>
           </div>
-          <div className="admin-topbar__account">
-            <span className="admin-avatar">
-              {admin.displayName?.charAt(0) || "A"}
-            </span>
-            <div>
-              <b>{admin.displayName}</b>
-              <small>{admin.role}</small>
+          <div className="admin-topbar__actions">
+            <Link className="admin-topbar__website" to="/" target="_blank" rel="noreferrer">
+              Lihat website <ArrowUpRight size={16} />
+            </Link>
+            <div className="admin-topbar__account" role="group" aria-label={`Akun ${admin.displayName || "Administrator"}, ${admin.role}`}>
+              <span className="admin-avatar" aria-hidden="true">
+                {(admin.displayName || "Administrator").trim().split(/\s+/).slice(0, 2).map((word) => word.charAt(0)).join("").toUpperCase()}
+              </span>
+              <div>
+                <b>{admin.displayName || "Administrator"}</b>
+                <small>{admin.role} <span>· Pengelola desa</span></small>
+              </div>
             </div>
           </div>
         </header>
@@ -266,12 +273,11 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
           <div hidden={active !== "dashboard"}>
             <section className="admin-welcome">
               <div>
-                <span className="admin-eyebrow">DASHBOARD DESA</span>
+                <span className="admin-eyebrow">Ringkasan desa</span>
                 <h1>Selamat datang kembali.</h1>
                 <p>
-                  Informasi tertata, pelayanan warga lebih mudah.
-                  <br />
-                  Mulai hari ini dari satu ruang kerja.
+                  Semua aktivitas desa, dalam satu ruang kerja.
+                  <br />Pantau informasi dan lanjutkan pelayanan hari ini.
                 </p>
                 <button
                   type="button"
@@ -290,13 +296,16 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
                     timeZone: "Asia/Jakarta",
                   }).format(new Date())}
                 </span>
-                <Building2 size={76} strokeWidth={1} />
-                <span>PEMERINTAH DESA TANJUNGJAYA</span>
+                <div className="admin-welcome__focus">
+                  <span className="admin-welcome__focus-icon"><FileText size={22} strokeWidth={1.6} /></span>
+                  <div><strong>{Number(counts.active_application_count || 0).toLocaleString("id-ID")}</strong><span>pengajuan aktif</span></div>
+                </div>
+                <p>{counts.active_application_count > 0 ? "Siap untuk Anda tindak lanjuti." : "Belum ada pengajuan yang perlu ditindaklanjuti."}</p>
               </div>
             </section>
             <div className="admin-section-heading">
               <div>
-                <h2>Gambaran hari ini</h2>
+                <h2>Aktivitas desa</h2>
                 <p>Ringkasan data dan aktivitas website desa.</p>
               </div>
               <button type="button" disabled={loading} onClick={reload}>
@@ -383,7 +392,7 @@ export default function AdminWorkspace({ panels, initialPanel = "dashboard" }) {
               return Panel ? (
                 <div key={key} hidden={active !== key}>
                   <div className="admin-module-heading">
-                    <span className="admin-eyebrow">PENGELOLAAN DESA</span>
+                    <span className="admin-eyebrow">Pengelolaan desa</span>
                     <h1>{navigation.find(([id]) => id === key)?.[1]}</h1>
                     <p>{navigation.find(([id]) => id === key)?.[3]}</p>
                   </div>
@@ -414,7 +423,7 @@ function Activity({ title, subtitle, icon: Icon, items, empty, onView, id }) {
           <button
             type="button"
             onClick={onView}
-            aria-label="Lihat semua buku tamu"
+            aria-label={`Lihat semua ${title.toLowerCase()}`}
           >
             <ArrowUpRight size={19} />
           </button>
@@ -432,7 +441,7 @@ function Activity({ title, subtitle, icon: Icon, items, empty, onView, id }) {
                 <p>{item.visit_purpose || item.subject}</p>
                 <small>{dateTime(item.created_at)}</small>
               </div>
-              <span className="admin-status">{item.status}</span>
+              <span className="admin-status" data-status={item.status}>{item.status}</span>
             </div>
           ))
         ) : (
