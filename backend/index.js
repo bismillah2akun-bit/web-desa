@@ -3,6 +3,7 @@ require('dotenv').config()
 const app = require('./src/app')
 const { pool, testConnection, initializeDatabase } = require('./src/config/database')
 const { ensureDefaultAdmin } = require('./src/services/authService')
+const { ensureBuiltinLetters } = require('./src/services/builtinLetters')
 
 const port = Number(process.env.PORT || 5000)
 const databaseRetryDelay = Number(process.env.DB_RETRY_DELAY_MS || 3000)
@@ -34,6 +35,7 @@ async function startServer() {
   try {
     await connectToDatabase()
     await initializeDatabase()
+    await ensureBuiltinLetters()
     await ensureDefaultAdmin()
 
     server = app.listen(port, '0.0.0.0', () => {

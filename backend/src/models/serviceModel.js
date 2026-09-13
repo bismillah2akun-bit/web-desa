@@ -49,8 +49,8 @@ async function create(service) {
       await connection.execute(
         `INSERT INTO service_requirements
           (service_type_id, label, field_name, field_type, instructions, options_json,
-           is_required, accepted_formats, max_file_size_mb, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           is_required, accepted_formats, max_file_size_mb, sort_order, template_stored_name, template_original_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           result.insertId,
           requirement.label,
@@ -62,6 +62,8 @@ async function create(service) {
           requirement.acceptedFormats,
           requirement.maxFileSizeMb,
           requirement.sortOrder,
+          requirement.templateStoredName || null,
+          requirement.templateOriginalName || null,
         ],
       )
     }
@@ -112,16 +114,17 @@ async function update(id, service) {
       await connection.execute(
         `INSERT INTO service_requirements
           (service_type_id, label, field_name, field_type, instructions, options_json,
-           is_required, accepted_formats, max_file_size_mb, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           is_required, accepted_formats, max_file_size_mb, sort_order, template_stored_name, template_original_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, requirement.label, requirement.fieldName, requirement.fieldType,
           requirement.instructions, JSON.stringify(requirement.options), requirement.isRequired,
-          requirement.acceptedFormats, requirement.maxFileSizeMb, requirement.sortOrder],
+          requirement.acceptedFormats, requirement.maxFileSizeMb, requirement.sortOrder,
+          requirement.templateStoredName || null, requirement.templateOriginalName || null],
       )
     }
 
     await connection.commit()
-    return findById(id, { includeInactive: true })
+    return Number(id)
   } catch (error) {
     await connection.rollback()
     throw error

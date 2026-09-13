@@ -7,17 +7,8 @@ import {
   useParams,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from "react-router-dom";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  GeoJSON,
-  ScaleControl,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
 import {
   MapPin,
   ArrowRight,
@@ -31,8 +22,6 @@ import {
   Mountain,
   Newspaper,
   Send,
-  LocateFixed,
-  Info,
   Users,
   Eye,
   EyeOff,
@@ -53,6 +42,8 @@ import {
   MobileNavToggle,
 } from "@/components/ui/resizable-navbar";
 import AdminServices from "@/pages/AdminServices";
+import ServiceTemplateLink from "@/components/ServiceTemplateLink";
+import LetterEditor from "@/pages/LetterEditor";
 import AdminNews from "@/pages/AdminNews";
 import AdminApplications from "@/pages/AdminApplications";
 import TrackApplication from "@/pages/TrackApplication";
@@ -63,8 +54,8 @@ import AdminContacts from "@/pages/AdminContacts";
 import AdminPotentials from "@/pages/AdminPotentials";
 import AdminWorkspace from '@/pages/AdminWorkspace';
 import Brand from "@/components/VillageBrand";
-import boundary from "@/data/tanjungjaya-boundary.json";
-import boundarySource from "@/data/tanjungjaya-boundary-source.json";
+import NewsGallery from "@/components/NewsGallery";
+import VillageMapDocument from "@/components/VillageMapDocument";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   note = "Data akan diperbarui oleh admin desa.";
@@ -90,58 +81,6 @@ const nav = [
   ["Berita", "/berita"],
   ["Kontak", "/kontak"],
 ];
-const boundaryInfo = boundary.features[0].properties;
-const boundaryBounds = L.geoJSON(boundary).getBounds();
-const boundaryFitOptions = { padding: [28, 28], maxZoom: 16 };
-const points = [
-  {
-    id: 1,
-    type: "office",
-    name: "Balai Desa Tanjungjaya",
-    cat: "Kantor Desa",
-    pos: [-6.9248, 107.428],
-    desc: "Posisi referensi dari tampilan Google Maps; perlu verifikasi lapangan.",
-  },
-  {
-    id: 2,
-    type: "facility",
-    name: "Fasilitas Pendidikan",
-    cat: "Fasilitas Umum",
-    pos: [-6.9195, 107.4205],
-    desc: note,
-  },
-  {
-    id: 3,
-    type: "facility",
-    name: "Fasilitas Kesehatan",
-    cat: "Fasilitas Umum",
-    pos: [-6.922, 107.433],
-    desc: note,
-  },
-  {
-    id: 4,
-    type: "potential",
-    name: "Sentra UMKM",
-    cat: "Potensi Desa",
-    pos: [-6.9165, 107.4125],
-    desc: "Lokasi contoh potensi UMKM.",
-  },
-  {
-    id: 5,
-    type: "potential",
-    name: "Area Pertanian",
-    cat: "Potensi Desa",
-    pos: [-6.928, 107.438],
-    desc: "Lokasi contoh area pertanian.",
-  },
-];
-const icon = (t) =>
-  L.divIcon({
-    className: `map-marker marker-${t}`,
-    html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></svg>',
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
-  });
 
 function Header() {
   const [o, setO] = useState(false),
@@ -967,12 +906,17 @@ function Government() {
           {officials.map((official, i) => (
             <article
               key={official.id}
-              className="official-card"
+              className={`official-card${official.photo_url ? " official-card--photo" : ""}`}
             >
+              {official.photo_url && <div className="official-card__photo" aria-hidden="true">
+                <img src={mediaUrl(official.photo_url)} alt="" loading="lazy" decoding="async" />
+              </div>}
+              <div className="official-card__content">
               <div className="official-card__top" aria-hidden="true">
                 <span className="official-card__icon"><Users size={22} strokeWidth={1.6} /></span>
                 <span className="official-card__number">{String(i + 1).padStart(2, "0")}</span>
               </div>
+              <div className="official-card__details">
               <p className="official-card__position">
                 {official.position}
               </p>
@@ -982,6 +926,8 @@ function Government() {
               <p className="official-card__description">
                 {official.description || note}
               </p>
+              </div>
+              </div>
             </article>
           ))}
           {!officials.length && (
@@ -1173,11 +1119,7 @@ function NewsDetail() {
         <h1 className="mt-4 font-serif text-4xl text-forest-950 md:text-5xl">
           {item.title}
         </h1>
-        <img
-          src={mediaUrl(item.image_url) || pics.village}
-          alt={item.title}
-          className="mt-8 aspect-[2/1] w-full rounded-2xl object-cover"
-        />
+        <NewsGallery key={item.id} images={item.image_urls || (item.image_url ? [item.image_url] : [])} title={item.title} resolveUrl={mediaUrl} fallback={pics.village} />
         {item.summary && (
           <p className="mt-8 text-lg font-semibold leading-8 text-stone-700">
             {item.summary}
@@ -1190,131 +1132,28 @@ function NewsDetail() {
     </Layout>
   );
 }
-function Reset() {
-  const m = useMap();
-  return (
-    <button
-      onClick={() => m.fitBounds(boundaryBounds, boundaryFitOptions)}
-      className="absolute right-3 top-3 z-[500] flex gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold shadow-lg"
-    >
-      <LocateFixed size={16} />
-      Seluruh wilayah desa
-    </button>
-  );
-}
-function WebMap({
-  active = { office: false, facility: false, potential: false },
-  height = "640px",
-}) {
-  return (
-    <MapContainer
-      bounds={boundaryBounds}
-      boundsOptions={boundaryFitOptions}
-      style={{ height, width: "100%" }}
-      scrollWheelZoom
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Batas: <a href="https://geoservices.big.go.id/rbi/rest/services/BATASWILAYAH/BATAS_DESAKEL_AR/MapServer/0">BIG</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <GeoJSON
-        data={boundary}
-        style={{
-          color: "#b91c1c",
-          weight: 2.5,
-          fillColor: "#b91c1c",
-          fillOpacity: 0.1,
-        }}
-      >
-        <Popup>
-          <div className="max-w-64 text-sm">
-            <b>Desa {boundaryInfo.NAMOBJ}</b>
-            <p>Kecamatan {boundaryInfo.WADMKC}, Kabupaten {boundaryInfo.WADMKK}</p>
-            <p>Kode desa: {boundaryInfo.KDEPUM}<br />Status BIG: {boundaryInfo.Status}</p>
-            <p>{boundaryInfo.REMARK}</p>
-            <a href={boundarySource.layerUrl} target="_blank" rel="noreferrer">Lihat sumber data BIG ↗</a>
-          </div>
-        </Popup>
-      </GeoJSON>
-      <ScaleControl position="bottomleft" imperial={false} />
-      {points
-        .filter((p) => active[p.type])
-        .map((p) => (
-          <Marker key={p.id} position={p.pos} icon={icon(p.type)}>
-            <Popup>
-              <div className="w-52">
-                <b>{p.name}</b>
-                <p className="text-xs text-earth-500">{p.cat}</p>
-                <p className="text-xs">
-                  Alamat akan diperbarui.
-                  <br />
-                  {p.desc}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      <Reset />
-    </MapContainer>
-  );
-}
 function WebGIS() {
-  const [a, setA] = useState({ office: false, facility: false, potential: false });
   return (
     <Layout>
       <PageHero
-        tag="WebGIS Desa"
-        title="Jelajahi wilayah Tanjungjaya"
-        desc="Peta untuk mengenali lokasi layanan, fasilitas umum, dan potensi desa."
+        tag="Peta Desa"
+        title="Peta jalan Desa Tanjungjaya"
+        desc="Kenali wilayah dan jaringan jalan desa melalui dokumen peta yang tersedia. Perbesar untuk melihat nama ruas jalan dan legenda."
       />
-      <section className="mx-auto max-w-[1500px] px-3 py-8">
-        <div className="mb-5 flex gap-3 rounded-xl bg-earth-100 p-4 text-sm">
-          <Info />
-          <p>
-            <b>Batas wilayah bersumber dari BIG.</b> Status data: {boundaryInfo.Status},
-            verifikasi teknis 2023. Titik fasilitas dan potensi masih berupa contoh;
-            aktifkan kategorinya jika ingin melihatnya.
-          </p>
-        </div>
-        <div className="grid overflow-hidden rounded-2xl border border-stone-200 bg-white lg:grid-cols-[280px_1fr]">
-          <aside className="border-r border-stone-200 p-5">
-            <h2 className="font-bold">Batas Desa Tanjungjaya</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-500">Kecamatan {boundaryInfo.WADMKC}<br />Kabupaten {boundaryInfo.WADMKK}</p>
-            <dl className="mt-5 space-y-3 rounded-xl bg-sage-50 p-4 text-sm">
-              <div><dt className="text-xs text-stone-500">Kode desa</dt><dd className="mt-1 font-semibold">{boundaryInfo.KDEPUM}</dd></div>
-              <div><dt className="text-xs text-stone-500">Status dalam dataset BIG</dt><dd className="mt-1 font-semibold">{boundaryInfo.Status}</dd></div>
-              <div><dt className="text-xs text-stone-500">Diambil dari sumber</dt><dd className="mt-1">7 September 2026</dd></div>
-            </dl>
-            <a href={boundarySource.layerUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-forest-900 underline underline-offset-4">Sumber data BIG <ArrowRight size={14} /></a>
-            <details className="mt-3 text-xs leading-6 text-stone-500"><summary className="cursor-pointer font-semibold">Keterangan data batas</summary><p className="mt-2">{boundaryInfo.REMARK}. Referensi peraturan belum tercantum pada dataset. Peta menampilkan geometri dari sumber, tanpa digitasi ulang.</p></details>
-            <h3 className="mt-6 border-t pt-5 text-sm font-bold">Titik lokasi contoh</h3>
-            <div className="mt-5 space-y-3">
-              {[
-                ["office", "Kantor Desa"],
-                ["facility", "Fasilitas Umum"],
-                ["potential", "Potensi & UMKM"],
-              ].map(([k, n]) => (
-                <label key={k} className="flex gap-3 rounded-xl border p-3">
-                  <input
-                    type="checkbox"
-                    checked={a[k]}
-                    onChange={() => setA({ ...a, [k]: !a[k] })}
-                  />
-                  <span className={`h-3 w-3 rounded-full marker-${k}`} />
-                  <span className="text-sm font-semibold">{n}</span>
-                </label>
-              ))}
-            </div>
-            <p className="mt-8 border-t pt-5 text-xs leading-6 text-stone-500">
-              <b>Legenda</b>
-              <br />
-              Garis merah: batas wilayah dari BIG
-              <br />
-              Marker: titik lokasi contoh
-            </p>
-          </aside>
-          <div className="relative min-h-[520px]">
-            <WebMap active={a} />
+      <section className="mx-auto max-w-[1500px] px-4 py-10 md:px-6">
+        <VillageMapDocument />
+        <div className="mt-6 grid gap-5 rounded-2xl border border-stone-200 bg-white p-6 md:grid-cols-3">
+          <div>
+            <h2 className="text-sm font-bold text-forest-950">Identitas dokumen</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-600">Peta Jalan Desa Tanjungjaya, Kecamatan Cihampelas. Kop dokumen mencantumkan Pemerintah Kabupaten Bandung Barat, Provinsi Jawa Barat.</p>
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-forest-950">Cara membaca peta</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-600">Legenda, skala cetak, serta daftar nama dan panjang ruas jalan ada di sisi kanan gambar. Ukuran tampilan di layar berubah mengikuti tingkat zoom.</p>
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-forest-950">Sesuai dokumen sumber</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-600">Gambar ditampilkan utuh tanpa tambahan titik contoh atau perubahan garis. Peta ini berupa dokumen gambar, bukan data koordinat untuk navigasi atau pengukuran batas.</p>
           </div>
         </div>
       </section>
@@ -1333,23 +1172,76 @@ function Field({ label, ...p }) {
   );
 }
 function ServiceApplicationForm({ service }) {
+  const [letters, setLetters] = useState({});
+  const [selectedLetters, setSelectedLetters] = useState(() => Object.fromEntries(
+    service.requirements.filter((item) => item.has_template && item.is_required).map((item) => [item.id, true]),
+  ));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editorRequirement = searchParams.get("layanan") === String(service.id)
+    ? service.requirements.find((item) => String(item.id) === searchParams.get("surat") && item.has_template)
+    : null;
+  useEffect(() => {
+    if (!editorRequirement) return;
+    setOpen(true);
+    setSelectedLetters((current) => ({ ...current, [editorRequirement.id]: true }));
+  }, [editorRequirement]);
+  useEffect(() => {
+    if (!Object.keys(letters).length) return;
+    const warn = (event) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [letters]);
   const [open, setOpen] = useState(false),
     [sending, setSending] = useState(false),
     [result, setResult] = useState(null),
     [error, setError] = useState("");
+  function closeEditor() {
+    setOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("surat");
+    setSearchParams(next, { replace: true, preventScrollReset: true });
+  }
+  function openEditor(requirement) {
+    setOpen(true);
+    setSelectedLetters((current) => ({ ...current, [requirement.id]: true }));
+    const next = new URLSearchParams(searchParams);
+    next.set("layanan", service.id);
+    next.set("surat", requirement.id);
+    setSearchParams(next, { preventScrollReset: true });
+  }
   async function submit(event) {
     event.preventDefault();
     const form = event.currentTarget;
     setSending(true);
     setError("");
     try {
+      const letterRequirements = service.requirements.filter((item) => item.has_template);
+      const requestedLetters = letterRequirements.filter((item) => item.is_required || selectedLetters[item.id]);
+      if (letterRequirements.length && !requestedLetters.length) {
+        throw new Error("Pilih minimal satu jenis surat yang ingin dibuat.");
+      }
+      for (const requirement of requestedLetters) {
+        if (!letters[requirement.id]?.confirmed) {
+          throw new Error(`Buka editor untuk ${requirement.label}, lalu pilih “Gunakan surat ini” sebelum mengirim.`);
+        }
+      }
+      const payload = new FormData(form);
+      const letterMetadata = {};
+      for (const requirement of requestedLetters) {
+        const { file, ...metadata } = letters[requirement.id];
+        letterMetadata[requirement.id] = metadata;
+        if (file) payload.append(`letter_${requirement.id}`, file);
+      }
+      payload.set("letters_json", JSON.stringify(letterMetadata));
       const response = await fetch(
           `${API}/services/${service.id}/applications`,
-          { method: "POST", body: new FormData(form) },
+          { method: "POST", body: payload },
         ),
         body = await response.json();
       if (!response.ok) throw new Error(body.message);
       setResult(body.data);
+      setLetters({});
+      setSelectedLetters(Object.fromEntries(letterRequirements.filter((item) => item.is_required).map((item) => [item.id, true])));
       form.reset();
     } catch (err) {
       setError(err.message || "Pengajuan belum dapat dikirim.");
@@ -1376,7 +1268,7 @@ function ServiceApplicationForm({ service }) {
         </p>
       </div>
     );
-  if (!open)
+  if (!open && !editorRequirement)
     return (
       <button
         type="button"
@@ -1391,6 +1283,11 @@ function ServiceApplicationForm({ service }) {
       onSubmit={submit}
       className="mt-6 rounded-2xl border border-sage-200 bg-sage-50 p-5"
     >
+      {editorRequirement && <LetterEditor key={editorRequirement.id} serviceId={service.id} requirement={editorRequirement}
+        draft={letters[editorRequirement.id]} onClose={closeEditor}
+        onDraftChange={(draft) => setLetters((current) => ({ ...current, [editorRequirement.id]: draft }))}
+        onUse={(draft) => { setLetters((current) => ({ ...current, [editorRequirement.id]: draft })); closeEditor(); }} />}
+      <fieldset disabled={sending} className="min-w-0">
       <h3 className="font-bold text-forest-950">Data pemohon</h3>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="Nama lengkap *" name="full_name" required />
@@ -1414,16 +1311,17 @@ function ServiceApplicationForm({ service }) {
           const name = `requirement_${requirement.id}`,
             required = Boolean(requirement.is_required),
             common = {
+              id: name,
               name,
               required,
               className: "mt-2 w-full rounded-xl border bg-white px-3 py-3",
             };
           return (
-            <label key={requirement.id} className="block">
-              <span className="text-sm font-semibold">
+            <div key={requirement.id} className="block">
+              <label htmlFor={requirement.has_template ? undefined : name} className="text-sm font-semibold">
                 {requirement.label}
                 {required ? " *" : ""}
-              </span>
+              </label>
               {requirement.instructions && (
                 <span className="mt-1 block text-xs text-stone-500">
                   {requirement.instructions}
@@ -1442,9 +1340,32 @@ function ServiceApplicationForm({ service }) {
                 </select>
               ) : requirement.field_type === "file" ? (
                 <>
+                  {requirement.has_template ? <>
+                    {!required && <label className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-sage-200 bg-white px-4 py-3 text-sm font-semibold">
+                      <input type="checkbox" checked={Boolean(selectedLetters[requirement.id])} onChange={(event) => {
+                        const checked = event.target.checked;
+                        setSelectedLetters((current) => ({ ...current, [requirement.id]: checked }));
+                        if (!checked) setLetters((current) => { const next = { ...current }; delete next[requirement.id]; return next; });
+                      }} />
+                      Pilih surat ini
+                    </label>}
+                    {(required || selectedLetters[requirement.id]) && <ServiceTemplateLink serviceId={service.id} requirement={requirement} draft={letters[requirement.id]} onEdit={() => openEditor(requirement)}
+                      onRemove={() => setLetters((current) => { const next = { ...current }; delete next[requirement.id]; return next; })} />}
+                  </> : <>
                   <input
                     {...common}
                     type="file"
+                    onChange={(event) => {
+                      const input = event.target;
+                      const file = input.files?.[0];
+                      const allowed = (requirement.accepted_formats || "pdf,jpg,jpeg,png").split(",").map((value) => value.trim().toLowerCase());
+                      if (file && (!allowed.includes(file.name.split(".").pop().toLowerCase()) || file.size > Number(requirement.max_file_size_mb || 5) * 1024 * 1024)) {
+                        input.value = "";
+                        setError(`Periksa ${requirement.label}: format ${requirement.accepted_formats}, maksimal ${requirement.max_file_size_mb || 5} MB.`);
+                      } else {
+                        setError("");
+                      }
+                    }}
                     accept={(requirement.accepted_formats || "pdf,jpg,jpeg,png")
                       .split(",")
                       .map((value) => `.${value.trim()}`)
@@ -1454,11 +1375,12 @@ function ServiceApplicationForm({ service }) {
                     Format: {requirement.accepted_formats || "pdf, jpg, png"} ·
                     Maks. {requirement.max_file_size_mb || 5} MB
                   </span>
+                  </>}
                 </>
               ) : (
                 <input {...common} type={requirement.field_type} />
               )}
-            </label>
+            </div>
           );
         })}
       </div>
@@ -1487,6 +1409,7 @@ function ServiceApplicationForm({ service }) {
         Dokumen disimpan secara privat dan hanya dapat diakses petugas yang
         berwenang.
       </p>
+      </fieldset>
     </form>
   );
 }
@@ -1551,10 +1474,11 @@ function Services() {
                     {service.requirements.map((requirement) => (
                       <li
                         key={requirement.id}
-                        className="flex items-start justify-between gap-4 rounded-xl bg-sage-50 px-4 py-3 text-sm"
+                        className="flex flex-col items-start justify-between gap-2 rounded-xl bg-sage-50 px-4 py-3 text-sm sm:flex-row sm:gap-4"
                       >
                         <div>
                           <b className="text-stone-700">{requirement.label}</b>
+                          <ServiceTemplateLink serviceId={service.id} requirement={requirement} compact />
                           {requirement.instructions && (
                             <p className="mt-1 text-xs leading-5 text-stone-500">
                               {requirement.instructions}
@@ -1638,10 +1562,7 @@ function Contact() {
             </div>
           ))}
           <div className="overflow-hidden rounded-2xl">
-            <WebMap
-              active={{ office: true, facility: false, potential: false }}
-              height="320px"
-            />
+            <VillageMapDocument compact />
           </div>
         </div>
         <form onSubmit={submit} className="rounded-2xl border bg-white p-8">

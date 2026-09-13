@@ -7,6 +7,8 @@ const serviceModel = require('../models/serviceModel')
 const AppError = require('../utils/AppError')
 const { sendSuccess } = require('../utils/apiResponse')
 const { cleanText, isValidEmail } = require('../utils/validation')
+const { generateLetter, generateNativeLetter } = require('../services/letterDocument')
+const { isBuiltinService } = require('../services/builtinLetters')
 
 function trackingCode() {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '')
@@ -18,6 +20,7 @@ async function removeUploadedFiles(files = []) {
 }
 
 async function submitApplication(req, res) {
+  const generatedFiles = []
   try {
     const service = await serviceModel.findById(req.params.id)
     if (!service) throw new AppError('Layanan tidak ditemukan atau sedang tidak aktif', 404)
@@ -29,14 +32,39 @@ async function submitApplication(req, res) {
     if (!isValidEmail(email)) throw new AppError('Format email tidak valid', 400)
 
     const uploadedByField = new Map((req.files || []).map((file) => [file.fieldname, file]))
+    if (uploadedByField.size !== (req.files || []).length) throw new AppError('Lampiran tidak boleh duplikat', 400)
+    const nativeUploads = []
+    let letters = {}
+    try { letters = req.body.letters_json ? JSON.parse(req.body.letters_json) : {} }
+    catch { throw new AppError('Format isian surat tidak valid', 400) }
+    if (!letters || typeof letters !== 'object' || Array.isArray(letters) || Object.keys(letters).length > 20) throw new AppError('Maksimal 20 surat per pengajuan', 400)
+    const validLetterIds = new Set(service.requirements.filter((item) => item.field_type === 'file' && item.template_stored_name).map((item) => String(item.id)))
+    if (Object.keys(letters).some((id) => !validLetterIds.has(id))) throw new AppError('Persyaratan surat sudah berubah. Muat ulang layanan', 409)
+    const letterRequirements = service.requirements.filter((item) => item.field_type === 'file' && item.template_stored_name)
+    if (isBuiltinService(service) && !Object.keys(letters).length) {
+      throw new AppError('Pilih dan isi minimal satu jenis surat', 400)
+    }
     const values = []
     const files = []
 
     for (const requirement of service.requirements) {
       const fieldName = `requirement_${requirement.id}`
       if (requirement.field_type === 'file') {
+        if (letters[requirement.id]) {
+          if (uploadedByField.has(fieldName)) throw new AppError('Surat tidak boleh dilampirkan dua kali', 400)
+          const draft = letters[requirement.id]
+          const nativeFile = uploadedByField.get(`letter_${requirement.id}`)
+          if (draft.format === 'docx' && !nativeFile) throw new AppError('Dokumen hasil edit belum disertakan', 400)
+          const generated = draft.format === 'docx'
+            ? await generateNativeLetter(requirement, draft, await fs.readFile(nativeFile.path))
+            : await generateLetter(requirement, draft)
+          if (draft.format === 'docx') nativeUploads.push(nativeFile)
+          generatedFiles.push(generated)
+          files.push({ ...generated, requirementId: requirement.id })
+          continue
+        }
         const file = uploadedByField.get(fieldName)
-        if (requirement.is_required && !file) throw new AppError(`${requirement.label} wajib diunggah`, 400)
+        if (requirement.is_required && !file) throw new AppError(`${requirement.label} wajib ${requirement.template_stored_name ? 'diisi melalui editor surat' : 'diunggah'}`, 400)
         if (!file) continue
         const allowed = (requirement.accepted_formats || '').toLowerCase().split(',').map((item) => item.trim())
         const extension = path.extname(file.originalname).slice(1).toLowerCase()
@@ -52,6 +80,9 @@ async function submitApplication(req, res) {
       }
     }
 
+    if (files.length - generatedFiles.length + nativeUploads.length !== (req.files || []).length || files.length > 20) {
+      throw new AppError('Lampiran tidak sesuai persyaratan terbaru. Muat ulang formulir dan pilih ulang dokumen', 400)
+    }
     const data = await applicationModel.create({
       serviceId: service.id,
       trackingCode: trackingCode(),
@@ -63,9 +94,11 @@ async function submitApplication(req, res) {
       values,
       files,
     })
+    await removeUploadedFiles(nativeUploads)
     return sendSuccess(res, { data, status: 201, message: 'Pengajuan berhasil dikirim' })
   } catch (error) {
     await removeUploadedFiles(req.files)
+    await removeUploadedFiles(generatedFiles)
     throw error
   }
 }

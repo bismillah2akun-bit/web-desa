@@ -1,4 +1,5 @@
 const { pool: db } = require('../config/database')
+const { withImages } = require('../utils/newsImages')
 
 const SPATIAL_COLUMNS = `
   id,
@@ -54,12 +55,12 @@ async function updateVillageProfile(profile) {
 
 async function findAllNews() {
   const [rows] = await db.query('SELECT * FROM news WHERE is_published = TRUE ORDER BY published_at DESC')
-  return rows
+  return rows.map(withImages)
 }
 
 async function findNewsById(id) {
   const [rows] = await db.execute('SELECT * FROM news WHERE id = ? AND is_published = TRUE', [id])
-  return rows[0] || null
+  return withImages(rows[0])
 }
 
 async function findSpatialRecords(table) {

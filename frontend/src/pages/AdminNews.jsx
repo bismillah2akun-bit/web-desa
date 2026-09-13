@@ -8,11 +8,12 @@ import {
   Plus,
   Save,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/VillageBrand";
 import { useConfirm } from "@/components/confirmContext";
+
+import NewsImagePicker from "@/components/NewsImagePicker";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const mediaUrl = (value) =>
@@ -24,19 +25,18 @@ const emptyForm = {
   category: "",
   summary: "",
   content: "",
-  image_url: "",
   is_published: true,
   published_at: "",
 };
 
-export default function AdminNews() {
+export default function AdminNews({ onDataChanged }) {
   const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
-  const [imageFile, setImageFile] = useState(null);
+  const [images, setImages] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,14 +55,13 @@ export default function AdminNews() {
   }
 
   function edit(item) {
-    setImageFile(null);
+    setImages((item.image_urls || (item.image_url ? [item.image_url] : [])).map((url) => ({ key: url, url })));
     setEditingId(item.id);
     setForm({
       title: item.title || "",
       category: item.category || "",
       summary: item.summary || "",
       content: item.content || "",
-      image_url: item.image_url || "",
       is_published: Boolean(item.is_published),
       published_at: item.published_at
         ? new Date(item.published_at).toISOString().slice(0, 16)
@@ -74,7 +73,7 @@ export default function AdminNews() {
   function reset() {
     setEditingId(null);
     setForm(emptyForm);
-    setImageFile(null);
+    setImages([]);
   }
 
   async function submit(event) {
@@ -86,7 +85,13 @@ export default function AdminNews() {
       Object.entries(form).forEach(([key, value]) =>
         payload.append(key, String(value ?? "")),
       );
-      if (imageFile) payload.append("image", imageFile);
+      let uploadIndex = 0;
+      const order = images.map((entry) => {
+        if (!entry.file) return { existing: entry.url };
+        payload.append("images", entry.file);
+        return { upload: uploadIndex++ };
+      });
+      payload.append("image_order", JSON.stringify(order));
       const response = await fetch(
         `${API}/admin/news${editingId ? `/${editingId}` : ""}`,
         {
@@ -106,6 +111,7 @@ export default function AdminNews() {
       );
       setNotice(body.message);
       reset();
+      onDataChanged?.();
     } catch (error) {
       setNotice(error.message || "Berita belum dapat disimpan");
     } finally {
@@ -185,6 +191,7 @@ export default function AdminNews() {
             onSubmit={submit}
             className="h-fit rounded-2xl border border-sage-200 bg-white p-6 md:p-8"
           >
+            <fieldset disabled={saving} className="min-w-0">
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-forest-900 text-white">
                 {editingId ? <Edit3 size={20} /> : <Plus size={20} />}
@@ -245,31 +252,7 @@ export default function AdminNews() {
                   className="mt-2 w-full rounded-xl border p-3"
                 />
               </label>
-              <label className="block">
-                <span className="text-sm font-semibold">Gambar berita</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="mt-2 block w-full rounded-xl border border-dashed bg-sage-50 px-3 py-4 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-forest-900 file:px-4 file:py-2 file:font-bold file:text-white"
-                />
-                <span className="mt-2 flex items-center gap-2 text-xs text-stone-500">
-                  <Upload size={14} /> JPG, PNG, atau WEBP · maksimal 5 MB
-                </span>
-                {(imageFile || form.image_url) && (
-                  <div className="mt-3 overflow-hidden rounded-xl border bg-stone-50">
-                    <img
-                      src={
-                        imageFile
-                          ? URL.createObjectURL(imageFile)
-                          : mediaUrl(form.image_url)
-                      }
-                      alt="Preview gambar berita"
-                      className="h-44 w-full object-cover"
-                    />
-                  </div>
-                )}
-              </label>
+              <NewsImagePicker value={images} onChange={setImages} resolveUrl={mediaUrl} disabled={saving} onError={setNotice} />
               <label className="flex items-center gap-3 rounded-xl bg-sage-50 p-4 text-sm font-semibold">
                 <input
                   type="checkbox"
@@ -297,6 +280,7 @@ export default function AdminNews() {
                 </button>
               )}
             </div>
+            </fieldset>
           </form>
           <section>
             <p className="text-xs font-bold uppercase tracking-[.2em] text-earth-500">
@@ -318,6 +302,7 @@ export default function AdminNews() {
                       className="mb-4 h-36 w-full rounded-xl object-cover"
                     />
                   )}
+                  {item.image_urls?.length > 0 && <p className="mb-3 text-xs text-stone-500">{item.image_urls.length} foto dalam galeri</p>}
                   <div className="flex items-start justify-between gap-5">
                     <div>
                       <span className="text-xs font-bold uppercase tracking-wide text-earth-500">
@@ -338,6 +323,7 @@ export default function AdminNews() {
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
                     <button
+                      disabled={saving}
                       onClick={() => edit(item)}
                       className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold"
                     >
@@ -345,7 +331,8 @@ export default function AdminNews() {
                       Edit
                     </button>
                     <button
-                      onClick={() => toggle(item)}
+                      disabled={saving}
+                      onClick={() => toggle(item).catch((error) => setNotice(error.message || "Status berita belum dapat diperbarui"))}
                       className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold"
                     >
                       {item.is_published ? (
@@ -366,6 +353,7 @@ export default function AdminNews() {
                       </Link>
                     )}
                     <button
+                      disabled={saving}
                       onClick={() => remove(item)}
                       className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700"
                     >

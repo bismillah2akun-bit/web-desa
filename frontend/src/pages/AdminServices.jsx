@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Edit3, FileText, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Edit3, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/VillageBrand";
 import { useConfirm } from "@/components/confirmContext";
+import AdminLetterEditor from "@/components/AdminLetterEditor";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const emptyRequirement = () => ({
+  key: crypto.randomUUID(),
   label: "",
   field_type: "text",
   instructions: "",
@@ -13,6 +15,8 @@ const emptyRequirement = () => ({
   accepted_formats: "pdf,jpg,jpeg,png",
   max_file_size_mb: 5,
   options_text: "",
+  template_file: null,
+  is_letter: false,
 });
 
 export default function AdminServices() {
@@ -23,6 +27,9 @@ export default function AdminServices() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [serviceActive, setServiceActive] = useState(true);
+  const [catalog, setCatalog] = useState(null);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [letterEditor, setLetterEditor] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,9 +46,41 @@ export default function AdminServices() {
   function updateRequirement(index, key, value) {
     setRequirements((current) =>
       current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [key]: value } : item,
+        itemIndex === index ? {
+          ...item, [key]: value,
+          ...(key === "field_type" && value !== "file" ? { is_letter: false, template_file: null, remove_template: true } : {}),
+        } : item,
       ),
     );
+  }
+
+  async function openCatalog() {
+    setShowCatalog((value) => !value);
+    if (catalog) return;
+    try {
+      const response = await fetch(`${API}/admin/letter-catalog`, { credentials: "include" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      setCatalog(result.data);
+    } catch (error) { setNotice(error.message || "Katalog surat belum tersedia"); setShowCatalog(false); }
+  }
+
+  function useEditedTemplate(file) {
+    setRequirements((current) => {
+      if (letterEditor.key) return current.map((item) => item.key === letterEditor.key ? {
+        ...item, template_file: file, remove_template: false, is_letter: true,
+        template_revision: (item.template_revision || 0) + 1,
+      } : item);
+      const requirement = { ...emptyRequirement(), label: letterEditor.label, field_type: "file", is_letter: true,
+        accepted_formats: "docx", template_file: file,
+        instructions: "Buka editor surat, lengkapi isian, lalu pilih Gunakan surat ini.",
+      };
+      const untouched = current.length === 1 && !current[0].id && !current[0].label && !current[0].instructions && current[0].field_type === "text";
+      return untouched ? [requirement] : [...current, requirement];
+    });
+    setLetterEditor(null);
+    setShowCatalog(false);
+    setNotice("Template siap digunakan. Tekan Simpan Layanan untuk menerapkan perubahan.");
   }
 
   async function submit(event) {
@@ -49,20 +88,20 @@ export default function AdminServices() {
     const formElement = event.currentTarget;
     setSaving(true);
     setNotice("");
-    const form = Object.fromEntries(new FormData(formElement));
-    const payload = {
-      ...form,
-      is_active: serviceActive,
-      requirements: requirements.map(
-        ({ options_text: optionsText, ...requirement }) => ({
-          ...requirement,
-          options: optionsText
-            .split(",")
-            .map((option) => option.trim())
-            .filter(Boolean),
-        }),
-      ),
-    };
+    const payload = new FormData(formElement);
+    payload.set("is_active", String(serviceActive));
+    payload.set("requirements", JSON.stringify(requirements.map((requirement, index) => {
+      if (requirement.template_file && requirement.field_type === "file") {
+        payload.append(`template_${index}`, requirement.template_file);
+      }
+      return {
+        id: requirement.id, label: requirement.label, field_type: requirement.field_type,
+        instructions: requirement.instructions, is_required: requirement.is_required,
+        accepted_formats: requirement.accepted_formats, max_file_size_mb: requirement.max_file_size_mb,
+        is_letter: requirement.is_letter, remove_template: Boolean(requirement.remove_template),
+        options: requirement.options_text.split(",").map((option) => option.trim()).filter(Boolean),
+      };
+    })));
 
     try {
       const response = await fetch(
@@ -70,8 +109,7 @@ export default function AdminServices() {
         {
           method: editingId ? "PUT" : "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: payload,
         },
       );
       const body = await response.json();
@@ -104,6 +142,12 @@ export default function AdminServices() {
     setServiceActive(Boolean(service.is_active));
     setRequirements(
       service.requirements.map((requirement) => ({
+        key: crypto.randomUUID(),
+        id: requirement.id,
+        has_template: requirement.has_template,
+        template_original_name: requirement.template_original_name,
+        template_file: null,
+        is_letter: Boolean(requirement.has_template),
         label: requirement.label,
         field_type: requirement.field_type,
         instructions: requirement.instructions || "",
@@ -149,6 +193,7 @@ export default function AdminServices() {
 
   return (
     <main className="min-h-screen bg-sage-50">
+      {letterEditor && <AdminLetterEditor source={letterEditor} onClose={() => setLetterEditor(null)} onSave={useEditedTemplate} />}
       <header className="border-b border-sage-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <Brand />
@@ -205,23 +250,26 @@ export default function AdminServices() {
                     {service.requirements.length} persyaratan · Estimasi{" "}
                     {service.estimated_days ?? "—"} hari
                   </p>
+                  {service.is_builtin && <p className="mt-4 rounded-lg bg-sage-50 px-3 py-2 text-xs font-semibold text-forest-900">Layanan bawaan · Template dapat disesuaikan</p>}
                   <div className="mt-4 flex gap-2">
                     <button
                       type="button"
                       onClick={() => edit(service)}
+                      disabled={saving}
                       className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold"
                     >
                       <Edit3 size={14} />
                       Edit
                     </button>
-                    <button
+                    {!service.is_builtin && <button
                       type="button"
                       onClick={() => remove(service)}
+                      disabled={saving}
                       className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700"
                     >
                       <Trash2 size={14} />
                       Hapus
-                    </button>
+                    </button>}
                   </div>
                 </article>
               ))
@@ -237,6 +285,7 @@ export default function AdminServices() {
           onSubmit={submit}
           className="h-fit rounded-2xl border border-sage-200 bg-white p-6 md:p-8"
         >
+          <fieldset disabled={saving} className="min-w-0">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-forest-900 text-white">
               <FileText size={20} />
@@ -309,13 +358,18 @@ export default function AdminServices() {
           </div>
 
           <div className="mt-8 border-t pt-7">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="font-bold text-forest-950">Persyaratan</h3>
                 <p className="mt-1 text-xs text-stone-500">
-                  Minimal satu persyaratan.
+                  Isian warga dan dokumen yang perlu dilampirkan.
                 </p>
               </div>
+              <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={openCatalog} aria-expanded={showCatalog}
+                className="flex items-center gap-2 rounded-xl border border-forest-900 px-3 py-2 text-xs font-bold text-forest-900">
+                <FileText size={15} /> Pilih surat dari assets
+              </button>
               <button
                 type="button"
                 onClick={() =>
@@ -324,17 +378,42 @@ export default function AdminServices() {
                 className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"
               >
                 <Plus size={15} />
-                Tambah
+                Tambah isian
               </button>
+              <button type="button" onClick={() => setRequirements((current) => {
+                const letter = {
+                  ...emptyRequirement(), field_type: "file", is_letter: true, accepted_formats: "docx",
+                  instructions: "Buka editor surat, lengkapi isian, lalu pilih Gunakan surat ini. Surat otomatis dilampirkan saat pengajuan dikirim.",
+                };
+                const untouched = current.length === 1 && !current[0].id && !current[0].label && !current[0].instructions && current[0].field_type === "text";
+                return untouched ? [letter] : [...current, letter];
+              })} className="flex items-center gap-2 rounded-xl bg-forest-900 px-3 py-2 text-xs font-bold text-white">
+                <FileText size={15} /> Tambah surat
+              </button>
+              </div>
             </div>
+            {showCatalog && <section className="mt-5 rounded-xl border border-sage-200 bg-sage-50 p-4" aria-label="Katalog surat">
+              <h4 className="font-bold text-forest-950">Tambahkan surat ke layanan</h4>
+              <p className="mt-2 text-sm leading-6 text-stone-600">Pilih surat yang sudah disiapkan, lalu edit salinannya. Bersihkan data warga sebelum memakai template pada layanan publik.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {catalog === null ? <p role="status">Memuat surat…</p> : catalog.length ? catalog.map((item) => (
+                  <button key={item.id} type="button" className="rounded-xl border bg-white p-4 text-left hover:border-forest-900"
+                    onClick={() => setLetterEditor({ catalog_id: item.id, label: item.label })}>
+                    <FileText size={20} className="mb-3 text-forest-900" /><b className="block text-sm">{item.label}</b>
+                    <span className="mt-1 block text-xs text-stone-500">{item.filename}</span>
+                    <span className="mt-3 block text-xs font-bold text-forest-900">Edit dan tambahkan →</span>
+                  </button>
+                )) : <p>Belum ada surat dalam katalog.</p>}
+              </div>
+            </section>}
             <div className="mt-5 space-y-4">
               {requirements.map((requirement, index) => (
                 <div
-                  key={index}
+                  key={requirement.key}
                   className="rounded-xl border border-sage-200 bg-sage-50 p-4"
                 >
                   <div className="flex items-center justify-between">
-                    <b className="text-sm">Persyaratan {index + 1}</b>
+                    <b className="text-sm">{requirement.is_letter ? "Surat" : "Persyaratan"} {index + 1}</b>
                     {requirements.length > 1 && (
                       <button
                         type="button"
@@ -372,7 +451,7 @@ export default function AdminServices() {
                         }
                         required
                         className="mt-1.5 w-full rounded-lg border bg-white px-3 py-2.5"
-                        placeholder="Contoh: Upload KTP"
+                        placeholder={requirement.is_letter ? "Contoh: Surat rekomendasi" : "Contoh: Upload KTP"}
                       />
                     </label>
                     <label>
@@ -432,6 +511,43 @@ export default function AdminServices() {
                     )}
                     {requirement.field_type === "file" && (
                       <>
+                        <div className="rounded-xl border border-sage-200 bg-white p-4 md:col-span-2">
+                          <label className="block">
+                            <span className="text-sm font-bold text-forest-950">Template surat {requirement.is_letter ? "*" : "(opsional)"}</span>
+                            <span className="mt-1 block text-xs leading-5 text-stone-500">DOCX, maksimal 10 MB. Warga mengisi surat langsung di editor web. Gunakan satu surat kosong per template, tanpa data pribadi atau tanda tangan.</span>
+                            <input key={requirement.template_revision || 0} type="file" accept=".docx"
+                              required={requirement.is_letter && !(requirement.has_template && !requirement.remove_template) && !requirement.template_file}
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (!file) return;
+                                if (!/\.docx$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
+                                  setNotice("Editor web membutuhkan template DOCX, maksimal 10 MB");
+                                  event.target.value = "";
+                                  return;
+                                }
+                                updateRequirement(index, "template_file", file);
+                              }} className="mt-3 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sage-50 file:px-3 file:py-2 file:font-semibold file:text-forest-900" />
+                          </label>
+                          {requirement.template_file ? <p className="mt-3 break-all text-sm font-medium text-forest-900">Siap disimpan: {requirement.template_file.name}</p> : requirement.has_template && !requirement.remove_template ? (
+                            <a href={`${API}/admin/services/${editingId}/templates/${requirement.id}`} className="mt-3 flex items-center gap-2 break-all text-sm font-semibold text-forest-900 underline underline-offset-4"><Download size={16} className="shrink-0" /> {requirement.template_original_name}</a>
+                          ) : null}
+                          {(requirement.template_file || (requirement.has_template && !requirement.remove_template)) && (
+                            <button type="button" className="mt-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-forest-900"
+                              onClick={() => setLetterEditor({ key: requirement.key, label: requirement.label || "Template surat", template_file: requirement.template_file,
+                                service_id: editingId, requirement_id: requirement.id })}>
+                              <Edit3 size={15} /> Edit isi template
+                            </button>
+                          )}
+                          {(requirement.template_file || (requirement.has_template && !requirement.remove_template)) && (
+                            <button type="button" className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-red-700" onClick={() => confirm({
+                              title: "Hapus template surat?", itemName: requirement.template_file?.name || requirement.template_original_name,
+                              description: "Kolom upload tetap ada. Template dihapus setelah layanan disimpan.",
+                              onConfirm: () => setRequirements((current) => current.map((item, i) => i === index ? { ...item, template_file: null, template_revision: (item.template_revision || 0) + 1, remove_template: true, is_letter: false } : item)),
+                            })}><Trash2 size={14} /> Hapus template</button>
+                          )}
+                          {requirement.has_template && !requirement.template_file && !/\.docx$/i.test(requirement.template_original_name || "") && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Template lama masih DOC/PDF. Ganti dengan DOCX agar warga bisa mengedit di web.</p>}
+                          <p className="mt-3 text-xs leading-5 text-stone-500">Tombol editor otomatis tampil pada formulir warga. Hasil isian dibuat menjadi DOCX dan dilampirkan langsung ketika pengajuan dikirim.</p>
+                        </div>
                         <label>
                           <span className="text-xs font-semibold">
                             Format file
@@ -515,6 +631,7 @@ export default function AdminServices() {
               </button>
             )}
           </div>
+          </fieldset>
         </form>
       </div>
     </main>

@@ -19,7 +19,7 @@ Database kosong akan dibuatkan tabel secara otomatis saat aplikasi pertama kali 
 2. Atur mount path volume menjadi `/data`.
 3. Pastikan variable `STORAGE_PATH=/data` sudah tersedia.
 
-Tanpa Volume, gambar berita dan dokumen pengajuan dapat hilang saat Railway melakukan redeploy.
+Tanpa Volume, gambar berita, template surat layanan, dan dokumen pengajuan dapat hilang saat Railway melakukan redeploy. Template disimpan di `/data/private/templates` jika `STORAGE_PATH=/data`.
 
 ## 4. Generate domain
 

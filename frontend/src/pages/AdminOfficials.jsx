@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Edit3, Plus, Save, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit3, ImagePlus, Plus, Save, Trash2, Users, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/components/confirmContext";
 
@@ -8,9 +8,14 @@ const emptyForm = {
   position: "",
   name: "",
   description: "",
+  photo_url: "",
+  remove_photo: false,
   sort_order: 0,
   is_active: true,
 };
+const mediaUrl = (value) => value?.startsWith("/uploads/")
+  ? `${new URL(API, window.location.origin).origin}${value}`
+  : value;
 
 export default function AdminOfficials() {
   const confirm = useConfirm();
@@ -19,7 +24,12 @@ export default function AdminOfficials() {
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoRevision, setPhotoRevision] = useState(0);
   const navigate = useNavigate();
+  const photoPreview = useMemo(() => photoFile ? URL.createObjectURL(photoFile) : mediaUrl(form.photo_url), [photoFile, form.photo_url]);
+
+  useEffect(() => () => { if (photoFile && photoPreview) URL.revokeObjectURL(photoPreview); }, [photoFile, photoPreview]);
 
   useEffect(() => {
     fetch(`${API}/admin/officials`, { credentials: "include" })
@@ -40,6 +50,8 @@ export default function AdminOfficials() {
   function reset() {
     setEditingId(null);
     setForm(emptyForm);
+    setPhotoFile(null);
+    setPhotoRevision((value) => value + 1);
   }
 
   function edit(item) {
@@ -48,6 +60,8 @@ export default function AdminOfficials() {
       position: item.position || "",
       name: item.name || "",
       description: item.description || "",
+      photo_url: item.photo_url || "",
+      remove_photo: false,
       sort_order: item.sort_order ?? 0,
       is_active: Boolean(item.is_active),
     });
@@ -59,13 +73,15 @@ export default function AdminOfficials() {
     setSaving(true);
     setNotice("");
     try {
+      const payload = new FormData();
+      Object.entries(form).forEach(([key, value]) => payload.set(key, String(value)));
+      if (photoFile) payload.set("photo", photoFile);
       const response = await fetch(
         `${API}/admin/officials${editingId ? `/${editingId}` : ""}`,
         {
           method: editingId ? "PUT" : "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: payload,
         },
       );
       const body = await response.json();
@@ -167,6 +183,28 @@ export default function AdminOfficials() {
                   className="mt-2 w-full rounded-xl border p-3"
                 />
               </label>
+              <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-forest-900"><ImagePlus size={18} /></span>
+                  <div><p className="text-sm font-bold text-forest-950">Foto perangkat desa</p><p className="text-xs text-stone-500">JPG, PNG, atau WEBP · maksimal 5 MB</p></div>
+                </div>
+                {photoPreview && <div className="mt-4 overflow-hidden rounded-xl bg-stone-200"><img src={photoPreview} alt="Pratinjau perangkat desa" className="h-56 w-full object-cover object-top" /></div>}
+                <input key={photoRevision} type="file" accept="image/jpeg,image/png,image/webp" className="mt-4 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-forest-900" onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  if (file && file.size > 5 * 1024 * 1024) {
+                    setNotice("Ukuran foto maksimal 5 MB");
+                    event.target.value = "";
+                    return;
+                  }
+                  setPhotoFile(file);
+                  if (file) change("remove_photo", false);
+                }} />
+                {photoPreview && <button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-red-700" onClick={() => {
+                  setPhotoFile(null);
+                  setPhotoRevision((value) => value + 1);
+                  setForm((current) => ({ ...current, photo_url: "", remove_photo: true }));
+                }}><X size={14} /> Hapus foto</button>}
+              </div>
               <label className="block">
                 <span className="text-sm font-semibold">Urutan tampil</span>
                 <input
@@ -218,9 +256,7 @@ export default function AdminOfficials() {
                   className="flex flex-col gap-4 rounded-2xl border border-sage-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-start gap-4">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sage-100 text-forest-900">
-                      <Users size={18} />
-                    </span>
+                    {item.photo_url ? <img src={mediaUrl(item.photo_url)} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover object-top" /> : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sage-100 text-forest-900"><Users size={18} /></span>}
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wide text-earth-500">
                         {item.position}

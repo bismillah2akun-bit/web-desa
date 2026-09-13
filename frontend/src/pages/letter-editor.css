@@ -1,0 +1,56 @@
+.letter-editor { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: #f1f2f4; color: #25252b; font-family: "Geist Variable", sans-serif; }
+.letter-editor[open] { display: flex; flex-direction: column; }
+.letter-editor::backdrop { background: #f1f2f4; }
+.letter-editor button { cursor: pointer; }
+.letter-editor button:disabled { opacity: .45; cursor: not-allowed; }
+.letter-editor button:focus-visible, .letter-editor input:focus-visible { outline: 3px solid #bf302b; outline-offset: 3px; }
+.letter-editor-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #fff; border-bottom: 1px solid #e3e4e8; padding: 18px 28px; }
+.letter-back { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.letter-editor-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.letter-editor-heading > svg { flex-shrink: 0; color: #b8231b; }
+.letter-editor-heading p { color: #8c8c96; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.letter-editor-heading h1 { font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+.letter-draft-badge { font-size: 11px; white-space: nowrap; border: 1px solid #e4e5ea; border-radius: 20px; padding: 6px 12px; color: #757581; }
+.letter-editor-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+.letter-editor-sidebar { padding: 32px 24px; background: #fff; border-right: 1px solid #e3e4e8; overflow-y: auto; }
+.letter-step { color: #b8231b; font-size: 11px; font-weight: 700; letter-spacing: .13em; }
+.letter-editor-sidebar h2 { margin: 12px 0; font-size: 26px; font-weight: 650; letter-spacing: -.04em; }
+.letter-editor-sidebar > p:not(.letter-step) { font-size: 13px; line-height: 1.8; color: #757581; }
+.letter-editor-tabs { margin: 22px 0; padding: 4px; display: flex; gap: 4px; background: #f1f2f4; border-radius: 10px; }
+.letter-editor-tabs button { flex: 1; padding: 8px; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.letter-editor-tabs button[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 4px #1a203015; }
+.letter-editor-tip { display: flex; gap: 10px; padding: 14px; background: #fff6f3; border: 1px solid #f6e6e0; border-radius: 12px; }
+.letter-editor-tip svg { flex-shrink: 0; color: #b8231b; }
+.letter-editor-tip p { font-size: 12px; line-height: 1.8; color: #76524b; }
+.letter-editor-note { margin-top: 16px; }
+.letter-editor-confirm { display: flex; align-items: flex-start; gap: 10px; margin: 24px 0 16px; font-size: 13px; line-height: 1.6; }
+.letter-editor-confirm input { margin-top: 4px; accent-color: #b8231b; }
+.letter-use { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: #b8231b; border-radius: 10px; padding: 13px; color: #fff; font-weight: 650; font-size: 13px; }
+.letter-editor-canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 12px; }
+.letter-native-editor { flex: 1; min-height: 0; height: 100%; width: 100%; border: 1px solid #dedfe5; border-radius: 12px; overflow: hidden; }
+.letter-paper { margin: 0 auto; width: 794px; max-width: none; min-height: 1050px; padding: 65px 60px; background: white; box-shadow: 0 8px 35px #1620300b, 0 0 0 1px #e2e3e7; font-family: "Times New Roman", serif; }
+.letter-paragraph--header { position: relative; }
+.letter-header-logo { position: absolute; max-width: none; object-fit: contain; pointer-events: none; }
+.letter-paragraph { margin: 3px 0; line-height: 1.55; }
+.letter-paragraph textarea { display: block; width: 100%; min-height: 1.55em; resize: none; overflow: hidden; padding: 2px 4px; border: 1px solid transparent; border-radius: 3px; background: transparent; font-family: inherit; line-height: inherit; }
+.letter-paragraph textarea:hover { border-color: #e0d7d3; background: #fffbf8; }
+.letter-paragraph textarea:focus { outline: 2px solid #b8231b55; background: #fffbf8; }
+.letter-paragraph textarea::placeholder { color: #b2a9a1; font-size: 11px; font-weight: 400; }
+.letter-text { white-space: pre-wrap; overflow-wrap: anywhere; padding: 2px 4px; }
+.letter-image { display: inline-block; max-width: 100%; max-height: 130px; object-fit: contain; }
+.letter-table-scroll { width: 100%; overflow-x: auto; }
+.letter-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.letter-table td { padding: 2px 4px; vertical-align: top; border: 1px dotted #e8e8e8; }
+.letter-editor-caption { text-align: center; margin: 20px 0; color: #8a8a94; font-size: 11px; overflow-wrap: anywhere; }
+.letter-editor-message { background: #fff; border: 1px solid #e3e4e8; border-radius: 12px; padding: 32px; display: grid; justify-items: center; gap: 16px; text-align: center; }
+.letter-editor-message button { color: #b8231b; text-decoration: underline; }
+.letter-editor-warning { max-width: 794px; margin: 0 auto 18px; padding: 15px; border-radius: 10px; background: #fff5d5; font-size: 13px; }
+@media (max-width: 850px) {
+  .letter-editor-header { padding: 14px 16px; gap: 12px; flex-wrap: wrap; }
+  .letter-editor-heading { order: 3; flex-basis: 100%; }
+  .letter-editor-layout { display: flex; flex-direction: column; overflow-y: auto; }
+  .letter-editor-sidebar { padding: 20px; overflow: visible; border-right: 0; }
+  .letter-editor-sidebar h2 { font-size: 23px; }
+  .letter-editor-canvas { flex-shrink: 0; height: 85dvh; min-height: 550px; padding: 8px; }
+  .letter-editor-sidebar .letter-editor-note { font-size: 11px; }
+}

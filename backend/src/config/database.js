@@ -33,6 +33,10 @@ async function initializeDatabase() {
     if (seedTable && existingTables.has(seedTable)) continue
     await pool.query(statement)
   }
+  const [newsColumns] = await pool.query("SHOW COLUMNS FROM news LIKE 'image_urls'")
+  if (!newsColumns.length) {
+    await pool.query('ALTER TABLE news ADD COLUMN image_urls JSON NULL')
+  }
   const [columns] = await pool.query("SHOW COLUMNS FROM service_types LIKE 'deleted_at'")
   if (!columns.length) {
     await pool.query('ALTER TABLE service_types ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL')
@@ -42,6 +46,10 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE service_requirements ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
   }
   const [requirementIndexes] = await pool.query("SHOW INDEX FROM service_requirements WHERE Key_name = 'uq_service_requirement_field'")
+  for (const name of ['template_stored_name', 'template_original_name']) {
+    const [templateColumns] = await pool.query(`SHOW COLUMNS FROM service_requirements LIKE '${name}'`)
+    if (!templateColumns.length) await pool.query(`ALTER TABLE service_requirements ADD COLUMN ${name} VARCHAR(255) NULL`)
+  }
   if (requirementIndexes.length) {
     const [typeIndexes] = await pool.query("SHOW INDEX FROM service_requirements WHERE Key_name = 'idx_service_requirements_type'")
     if (!typeIndexes.length) {
@@ -60,6 +68,10 @@ async function initializeDatabase() {
   for (const [name, definition] of profileColumns) {
     const [profileColumn] = await pool.query(`SHOW COLUMNS FROM village_profile LIKE '${name}'`)
     if (!profileColumn.length) await pool.query(`ALTER TABLE village_profile ADD COLUMN ${name} ${definition}`)
+  }
+  const [officialPhotoColumn] = await pool.query("SHOW COLUMNS FROM government_officials LIKE 'photo_url'")
+  if (!officialPhotoColumn.length) {
+    await pool.query('ALTER TABLE government_officials ADD COLUMN photo_url TEXT NULL AFTER description')
   }
   await pool.query(`UPDATE village_profile
     SET welcome_title = COALESCE(NULLIF(welcome_title, ''), 'Bersama membangun desa yang terbuka dan berdaya'),
