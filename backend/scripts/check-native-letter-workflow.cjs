@@ -175,6 +175,32 @@ async function run() {
     assert.equal(detail.files.length, 2)
     assert.deepEqual(errors, [])
     await page.close()
+    await check('Admin UI shows submitted letter count and opens DOCX preview', async () => {
+      const adminPage = await browser.newPage({ viewport: { width: 1440, height: 950 } })
+      const pageErrors = []; adminPage.on('pageerror', (error) => pageErrors.push(error.message))
+      await adminPage.route('**/api/**', async (route) => {
+        const url = new URL(route.request().url())
+        const headers = { ...route.request().headers(), Cookie: cookie }
+        const response = await route.fetch({ url: base + url.pathname.replace(/^\/api/, '') + url.search, headers })
+        await route.fulfill({ response })
+      })
+      await adminPage.goto(`${process.env.VITE_TEST_URL || 'http://localhost:5173'}/admin/pengajuan`)
+      await adminPage.getByRole('heading', { name: 'Daftar pengajuan' }).waitFor()
+      const applicationCard = adminPage.getByRole('button').filter({ hasText: result.data.trackingCode })
+      await applicationCard.getByText('1 surat', { exact: true }).waitFor()
+      await applicationCard.getByText('1 lampiran', { exact: true }).waitFor()
+      await applicationCard.click()
+      await adminPage.getByRole('heading', { name: 'Surat dan lampiran warga' }).waitFor()
+      assert.equal(await adminPage.getByText('Surat hasil isian warga', { exact: false }).count(), 1)
+      await adminPage.getByRole('button', { name: 'Lihat surat', exact: true }).click()
+      await adminPage.getByRole('heading', { name: 'Surat utama' }).waitFor()
+      await adminPage.locator('.letter-native-editor').waitFor({ timeout: 30000 })
+      await adminPage.getByText('WARGA QA UI', { exact: true }).waitFor()
+      assert.equal(await adminPage.locator('.letter-native-editor [role="toolbar"]').count(), 0)
+      await adminPage.getByRole('button', { name: 'Tutup pratinjau' }).click()
+      assert.deepEqual(pageErrors, [])
+      await adminPage.close()
+    })
   })
 }
 

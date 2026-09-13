@@ -2,7 +2,7 @@
 
 ## Ringkasan
 
-**20/20 skenario integrasi alur lulus.** Kelima surat asli juga lulus pengujian browser buka–edit–simpan DOCX dan pemeriksaan penguncian/preservasi kop. Tidak ada perubahan kode aplikasi pada sesi QA ini; penambahan hanya skrip pengujian dan laporan.
+**21/21 skenario integrasi alur lulus.** Kelima surat asli juga lulus pengujian browser buka–edit–simpan DOCX dan pemeriksaan penguncian/preservasi kop.
 
 ## Lingkungan dan isolasi
 
@@ -12,7 +12,7 @@
 - Uji alur penuh menggunakan formulir aplikasi sebenarnya. Semua permintaan API dari browser uji tersebut diarahkan ke backend QA sebelum halaman dibuka, bukan backend/database desa.
 - Pemohon, KTP, dan surat pengajuan sintetis; tidak mengirim WhatsApp atau mengubah data warga. Template sumber tidak ditimpa. Container/database dan berkas dokumen uji dibersihkan setelah selesai.
 
-## Skenario integrasi: 20 lulus
+## Skenario integrasi: 21 lulus
 
 1. Admin mengunggah template, membuat layanan, membuka DOCX native; berkas sumber tetap sama.
 2. Isian wajib surat kosong ditolak; berkas sementara dibersihkan.
@@ -34,6 +34,7 @@
 18. Ponsel: dokumen dapat digulir/dibuka dan tombol kembali berfungsi.
 19. Koneksi gagal menampilkan tombol coba lagi; dokumen dapat dibuka setelah koneksi pulih.
 20. Formulir warga sebenarnya: isi surat melalui editor, isi data pemohon, unggah KTP, klik Kirim Pengajuan, lihat pesan sukses, lalu periksa dua lampiran di database/dashboard API admin.
+21. Dashboard pengajuan admin: kartu menampilkan jumlah surat/lampiran, detail membedakan surat hasil isian warga, pratinjau DOCX terbuka tanpa toolbar, dan isi surat warga dapat dibaca.
 
 ## Pemeriksaan tambahan
 
@@ -55,4 +56,4 @@ Pengujian ini tidak membuktikan bebas error untuk semua dokumen Word, browser, a
 - `backend/scripts/check-letterhead-preservation.cjs`: preservasi kop lima surat; tidak membutuhkan database.
 - `backend/scripts/check-service-letter-catalog.cjs`: regresi katalog/template pada database dan penyimpanan uji terpisah.
 
-Satu kegagalan awal disebabkan data estimasi `null` yang dikirim keliru oleh skrip tes, bukan formulir aplikasi. Skrip diperbaiki agar mengirim string kosong seperti aplikasi. Pengujian ponsel juga disesuaikan untuk menunggu pengaturan ulang halaman saat font dimuat. Pengujian final menghasilkan **20/20 lulus**, tanpa mengubah implementasi aplikasi.
+Satu kegagalan awal disebabkan data estimasi `null` yang dikirim keliru oleh skrip tes, bukan formulir aplikasi. Skrip diperbaiki agar mengirim string kosong seperti aplikasi. Pengujian ponsel juga disesuaikan untuk menunggu pengaturan ulang halaman saat font dimuat. Pengujian final menghasilkan **21/21 lulus**.

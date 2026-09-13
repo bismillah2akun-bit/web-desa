@@ -47,7 +47,11 @@ async function create(application) {
 
 async function findAll() {
   const [applications] = await db.query(`
-    SELECT application.*, service.name AS service_name
+    SELECT application.*, service.name AS service_name,
+      (SELECT COUNT(*) FROM application_files file WHERE file.application_id = application.id) AS file_count,
+      (SELECT COUNT(*) FROM application_files file
+        WHERE file.application_id = application.id
+          AND file.mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') AS letter_count
     FROM service_applications application
     JOIN service_types service ON service.id = application.service_type_id
     ORDER BY application.submitted_at DESC
@@ -70,7 +74,9 @@ async function findDetail(id) {
       FROM application_values value
       JOIN service_requirements requirement ON requirement.id = value.requirement_id
       WHERE value.application_id = ? ORDER BY requirement.sort_order`, [id]),
-    db.execute(`SELECT file.id, file.original_name, file.mime_type, file.file_size, requirement.label
+    db.execute(`SELECT file.id, file.original_name, file.mime_type, file.file_size, requirement.label,
+        CASE WHEN file.mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          AND requirement.template_stored_name IS NOT NULL THEN TRUE ELSE FALSE END AS is_generated_letter
       FROM application_files file
       JOIN service_requirements requirement ON requirement.id = file.requirement_id
       WHERE file.application_id = ? ORDER BY requirement.sort_order`, [id]),
