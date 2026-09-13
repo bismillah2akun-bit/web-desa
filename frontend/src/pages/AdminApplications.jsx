@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import Brand from "@/components/VillageBrand";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -52,11 +53,16 @@ function ApplicationDocumentViewer({ file, onClose }) {
   }, [file.id]);
   useEffect(() => {
     const close = (event) => { if (event.key === "Escape") onClose(); };
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", close);
+    };
   }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#f3f4f6]" role="dialog" aria-modal="true" aria-labelledby="application-document-title">
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex h-dvh w-screen max-w-none flex-col overflow-hidden rounded-none bg-[#f3f4f6] p-0 shadow-none" role="dialog" aria-modal="true" aria-labelledby="application-document-title">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-stone-200 bg-white px-4 py-3 md:px-6">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[.16em] text-stone-400">Pratinjau surat warga</p>
@@ -70,12 +76,13 @@ function ApplicationDocumentViewer({ file, onClose }) {
           <button type="button" onClick={onClose} aria-label="Tutup pratinjau" className="rounded-xl border border-stone-200 p-2 text-stone-600"><X size={18} /></button>
         </div>
       </header>
-      <div className="min-h-0 flex-1 p-2 md:p-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col p-2 md:p-4">
         {error ? <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center text-sm text-red-700">{error}</div>
           : !documentBytes ? <div className="grid h-full place-items-center text-sm text-stone-500"><span className="flex items-center gap-2"><LoaderCircle className="animate-spin" size={18} /> Membuka surat…</span></div>
           : <ApplicationDocxPreview documentBytes={documentBytes} filename={file.original_name} />}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
