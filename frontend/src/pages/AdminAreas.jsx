@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { Edit3, Save, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit3, ImagePlus, Save, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/components/confirmContext";
 
 import AdminDataTable, { StatusBadge } from "@/components/AdminDataTable";
+import NeighborhoodOfficialManager from "@/components/NeighborhoodOfficialManager";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const empty = {
@@ -15,7 +16,12 @@ const empty = {
   data_year: "",
   source: "",
   status: "belum_diverifikasi",
+  photo_url: "",
+  remove_photo: false,
 };
+const mediaUrl = (value) => value?.startsWith("/uploads/")
+  ? `${new URL(API, window.location.origin).origin}${value}`
+  : value;
 
 export default function AdminAreas() {
   const confirm = useConfirm();
@@ -25,6 +31,8 @@ export default function AdminAreas() {
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoRevision, setPhotoRevision] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,12 +43,22 @@ export default function AdminAreas() {
       .finally(() => setLoading(false));
   }, []);
 
+  const photoPreview = useMemo(
+    () => photoFile ? URL.createObjectURL(photoFile) : mediaUrl(form.photo_url),
+    [photoFile, form.photo_url],
+  );
+  useEffect(() => () => {
+    if (photoFile && photoPreview) URL.revokeObjectURL(photoPreview);
+  }, [photoFile, photoPreview]);
+
   function change(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
   }
   function reset() {
     setForm(empty);
     setEditingId(null);
+    setPhotoFile(null);
+    setPhotoRevision((value) => value + 1);
   }
   function edit(area) {
     setEditingId(area.id);
@@ -49,6 +67,8 @@ export default function AdminAreas() {
         Object.keys(empty).map((key) => [key, area[key] ?? ""]),
       ),
     );
+    setPhotoFile(null);
+    setPhotoRevision((value) => value + 1);
   }
 
   async function submit(event) {
@@ -61,8 +81,12 @@ export default function AdminAreas() {
         {
           method: editingId ? "PUT" : "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: (() => {
+            const data = new FormData();
+            Object.entries(form).forEach(([key, value]) => data.set(key, String(value)));
+            if (photoFile) data.set("photo", photoFile);
+            return data;
+          })(),
         },
       );
       const body = await response.json();
@@ -180,6 +204,20 @@ export default function AdminAreas() {
             className="mt-1.5 w-full rounded-xl border bg-white px-3 py-2.5"
           />
         </label>
+        <div className="mt-4 rounded-xl border border-sage-200 bg-white p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-sage-50 text-forest-900"><ImagePlus size={17} /></span>
+            <div><p className="text-sm font-bold">Foto RT/RW</p><p className="text-xs text-stone-500">Opsional · JPG, PNG, WEBP · maksimal 5 MB</p></div>
+          </div>
+          {photoPreview && <img src={photoPreview} alt="Pratinjau RT/RW" className="mt-3 h-32 w-32 rounded-lg object-cover" />}
+          <input key={photoRevision} type="file" accept="image/jpeg,image/png,image/webp" className="mt-3 block w-full text-sm" onChange={(event) => {
+            const file = event.target.files?.[0] || null;
+            if (file && file.size > 5 * 1024 * 1024) { setNotice("Ukuran foto maksimal 5 MB"); event.target.value = ""; return; }
+            setPhotoFile(file);
+            if (file) change("remove_photo", false);
+          }} />
+          {photoPreview && <button type="button" onClick={() => { setPhotoFile(null); setPhotoRevision((value) => value + 1); setForm((current) => ({ ...current, photo_url: "", remove_photo: true })); }} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-red-700"><X size={13} /> Hapus foto</button>}
+        </div>
         <label className="mt-4 block">
           <span className="text-xs font-semibold">Status</span>
           <select
@@ -224,6 +262,7 @@ export default function AdminAreas() {
           defaultSort={{ key: "area", direction: "asc" }} emptyMessage="Belum ada rincian RT/RW"
         />
       </div>
+      <NeighborhoodOfficialManager />
     </section>
   );
 }

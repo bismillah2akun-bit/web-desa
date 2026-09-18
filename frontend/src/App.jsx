@@ -888,11 +888,16 @@ function Profile() {
 }
 function Government() {
   const [officials, setOfficials] = useState([]);
+  const [neighborhoodOfficials, setNeighborhoodOfficials] = useState([]);
   useEffect(() => {
     fetch(`${API}/officials`)
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((body) => setOfficials(body.data))
       .catch(() => setOfficials([]));
+    fetch(`${API}/neighborhood-officials`)
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((body) => setNeighborhoodOfficials(body.data || []))
+      .catch(() => setNeighborhoodOfficials([]));
   }, []);
   return (
     <Layout>
@@ -936,6 +941,26 @@ function Government() {
             </p>
           )}
         </div>
+        {neighborhoodOfficials.length > 0 && (
+          <section className="mt-10 border-t border-stone-200 pt-8" aria-labelledby="neighborhood-title">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-earth-500">Pelayanan kewilayahan</p>
+            <h2 id="neighborhood-title" className="mt-1 font-serif text-2xl text-forest-950">Ketua RT & RW</h2>
+            <p className="mt-2 text-sm text-stone-500">Perangkat lingkungan Desa Tanjungjaya.</p>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+              {neighborhoodOfficials.map((official) => (
+                <article key={official.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                  <div className="aspect-[4/3] bg-sage-100">
+                    {official.photo_url ? <img src={mediaUrl(official.photo_url)} alt={official.name} className="h-full w-full object-cover object-top" loading="lazy" /> : <div className="grid h-full place-items-center text-forest-800"><Users size={28} /></div>}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[.12em] text-earth-500">Ketua {official.level.toUpperCase()} {String(official.number).padStart(2, "0")}</p>
+                    <h3 className="mt-1 truncate text-sm font-bold text-forest-950">{official.name}</h3>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </section>
     </Layout>
   );
@@ -2003,15 +2028,14 @@ function AdminContentEditor() {
             {saving === "demographics" ? "Menyimpan..." : "Simpan Demografi"}
           </button>
         </form>
-        <AdminAreas />
       </div>
     </main>
   );
 }
 function AdminDashboard() {
   const { pathname } = useLocation();
-  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/potensi': 'potentials', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
-  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, potentials: AdminPotentials, profile: AdminContentEditor, officials: AdminOfficials }} />;
+  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/potensi': 'potentials', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials', '/admin/rt-rw': 'areas' }[pathname] || 'dashboard';
+  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, potentials: AdminPotentials, profile: AdminContentEditor, officials: AdminOfficials, areas: AdminAreas }} />;
 }
 function App() {
   return (

@@ -139,6 +139,7 @@ async function findDemographics() {
       data_year,
       source,
       status,
+      photo_url,
       updated_at
     FROM administrative_areas
     ORDER BY LPAD(rw_number, 10, '0'), LPAD(rt_number, 10, '0')
@@ -173,10 +174,10 @@ async function createAdministrativeArea(area) {
   const [result] = await db.execute(
     `INSERT INTO administrative_areas
       (rw_number, rt_number, household_count, male_population, female_population,
-       data_year, source, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      data_year, source, status, photo_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [area.rwNumber, area.rtNumber, area.householdCount, area.malePopulation,
-      area.femalePopulation, area.dataYear, area.source, area.status],
+      area.femalePopulation, area.dataYear, area.source, area.status, area.photoUrl],
   )
   const [rows] = await db.execute('SELECT * FROM administrative_areas WHERE id = ?', [result.insertId])
   return rows[0]
@@ -186,10 +187,10 @@ async function updateAdministrativeArea(id, area) {
   const [result] = await db.execute(
     `UPDATE administrative_areas
      SET rw_number = ?, rt_number = ?, household_count = ?, male_population = ?,
-         female_population = ?, data_year = ?, source = ?, status = ?
+         female_population = ?, data_year = ?, source = ?, status = ?, photo_url = ?
      WHERE id = ?`,
     [area.rwNumber, area.rtNumber, area.householdCount, area.malePopulation,
-      area.femalePopulation, area.dataYear, area.source, area.status, id],
+      area.femalePopulation, area.dataYear, area.source, area.status, area.photoUrl, id],
   )
   if (!result.affectedRows) return null
   const [rows] = await db.execute('SELECT * FROM administrative_areas WHERE id = ?', [id])
@@ -198,6 +199,34 @@ async function updateAdministrativeArea(id, area) {
 
 async function deleteAdministrativeArea(id) {
   const [result] = await db.execute('DELETE FROM administrative_areas WHERE id = ?', [id])
+  return result.affectedRows > 0
+}
+
+async function findNeighborhoodOfficials({ activeOnly = false } = {}) {
+  const [rows] = await db.query(`SELECT id, level, number, name, photo_url, sort_order, is_active
+    FROM neighborhood_officials ${activeOnly ? 'WHERE is_active = TRUE' : ''}
+    ORDER BY FIELD(level, 'rw', 'rt'), LPAD(number, 10, '0'), sort_order, id`)
+  return rows
+}
+
+async function createNeighborhoodOfficial(item) {
+  const [result] = await db.execute(`INSERT INTO neighborhood_officials
+    (level, number, name, photo_url, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)`,
+  [item.level, item.number, item.name, item.photoUrl, item.sortOrder, item.isActive])
+  const [rows] = await db.execute('SELECT * FROM neighborhood_officials WHERE id = ?', [result.insertId])
+  return rows[0]
+}
+
+async function updateNeighborhoodOfficial(id, item) {
+  const [result] = await db.execute(`UPDATE neighborhood_officials SET level=?, number=?, name=?, photo_url=?, sort_order=?, is_active=? WHERE id=?`,
+    [item.level, item.number, item.name, item.photoUrl, item.sortOrder, item.isActive, id])
+  if (!result.affectedRows) return null
+  const [rows] = await db.execute('SELECT * FROM neighborhood_officials WHERE id = ?', [id])
+  return rows[0]
+}
+
+async function deleteNeighborhoodOfficial(id) {
+  const [result] = await db.execute('DELETE FROM neighborhood_officials WHERE id = ?', [id])
   return result.affectedRows > 0
 }
 
@@ -215,4 +244,8 @@ module.exports = {
   createAdministrativeArea,
   updateAdministrativeArea,
   deleteAdministrativeArea,
+  findNeighborhoodOfficials,
+  createNeighborhoodOfficial,
+  updateNeighborhoodOfficial,
+  deleteNeighborhoodOfficial,
 }

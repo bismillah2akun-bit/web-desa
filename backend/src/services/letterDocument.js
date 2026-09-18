@@ -14,6 +14,32 @@ const children = (node) => Array.from(node.childNodes || []).filter((child) => c
 const value = (node, name) => elements(node, name)[0]?.getAttributeNS(W, 'val') || ''
 const invalid = (message) => new AppError(message, 400)
 const fieldMarker = (text) => text.trim().match(/^\[\[([^\]\r\n]{1,80})\]\]$/)?.[1]
+const indonesianMonths = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember']
+
+// Existing official templates commonly contain a fixed signing date such as
+// "Tanjungjaya, 18 September 2026", rather than a [[Tanggal]] marker. Treat
+// only that standalone location/date line as a citizen-editable field. The
+// location stays fixed and the submitted value is validated below.
+function signingDateField(text) {
+  const match = text.trim().match(/^((?:Tanjungjaya|Cihampelas)\s*,\s*)(.+)$/i)
+  if (!match || !isIndonesianDate(match[2])) return null
+  return { label: 'Tanggal surat', prefix: match[1] }
+}
+
+function isIndonesianDate(value) {
+  const text = String(value || '').trim()
+  const words = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+  if (words) {
+    const day = Number(words[1]); const month = indonesianMonths.indexOf(words[2].toLowerCase()); const year = Number(words[3])
+    const date = new Date(Date.UTC(year, month, day))
+    return month >= 0 && date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day
+  }
+  const numeric = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (!numeric) return false
+  const day = Number(numeric[1]); const month = Number(numeric[2]) - 1; const year = Number(numeric[3])
+  const date = new Date(Date.UTC(year, month, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day
+}
 
 // XML namespace placement / attribute order may change during a DOCX round-trip.
 function canonicalXml(node) {
@@ -132,16 +158,23 @@ async function readDocument(input) {
     const label = fieldMarker(paragraphText(paragraph))
     return label ? [[id, label]] : []
   }))
-  return { zip, document, body, records, editableFields, lockedHeader: letterheadIds(records), version: crypto.createHash('sha256').update(input).digest('hex') }
+  const lockedHeader = letterheadIds(records)
+  const editableDateFields = new Map([...records].flatMap(([id, paragraph]) => {
+    if (lockedHeader.has(id) || editableFields.has(id)) return []
+    const date = signingDateField(paragraphText(paragraph))
+    return date ? [[id, date]] : []
+  }))
+  return { zip, document, body, records, editableFields, editableDateFields, lockedHeader, version: crypto.createHash('sha256').update(input).digest('hex') }
 }
 
 // Word content controls lock the letterhead in the native editor, without moving it
 // into a different HTML layout. Locks are also checked on the server when saving.
 async function nativeEditorDocument(requirement, { templateMode = false } = {}) {
   const loaded = await loadTemplate(requirement)
-  const { document, records, lockedHeader, editableFields } = loaded
+  const { document, records, lockedHeader, editableFields, editableDateFields } = loaded
   for (const [id, paragraph] of records) {
-    if (!lockedHeader.has(id) && (templateMode || !editableFields.size || editableFields.has(id))) continue
+    const hasCitizenFields = editableFields.size || editableDateFields.size
+    if (!lockedHeader.has(id) && (templateMode || !hasCitizenFields || editableFields.has(id) || editableDateFields.has(id))) continue
     const wrapper = document.createElementNS(W, 'w:sdt')
     const props = document.createElementNS(W, 'w:sdtPr')
     for (const [name, val] of [['tag', `desa-lock-${id}`], ['lock', 'sdtContentLocked']]) {
@@ -157,7 +190,7 @@ async function nativeEditorDocument(requirement, { templateMode = false } = {}) 
   }
   loaded.zip.file('word/document.xml', new XMLSerializer().serializeToString(document))
   const buffer = await loaded.zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
-  return { version: loaded.version, filename: requirement.template_original_name, docx: buffer.toString('base64'), fields: [...editableFields.values()] }
+  return { version: loaded.version, filename: requirement.template_original_name, docx: buffer.toString('base64'), fields: [...editableFields.values()], dateFields: [...editableDateFields.values()].map((field) => field.label) }
 }
 
 async function generateNativeLetter(requirement, draft, input, { templateMode = false } = {}) {
@@ -169,11 +202,19 @@ async function generateNativeLetter(requirement, draft, input, { templateMode = 
   const changes = {}
   for (const [id, paragraph] of original.records) {
     const current = edited.records.get(id)
-    if (!templateMode && original.editableFields.size) {
+    const hasCitizenFields = original.editableFields.size || original.editableDateFields.size
+    if (!templateMode && hasCitizenFields) {
       if (!current || original.records.size !== edited.records.size) throw invalid('Struktur formulir surat tidak boleh diubah')
       if (original.editableFields.has(id)) {
         const text = paragraphText(current)
-        if (fieldMarker(text)) throw invalid(`${original.editableFields.get(id)} wajib diisi`)
+        const label = original.editableFields.get(id)
+        if (!text.trim() || fieldMarker(text)) throw invalid(`${label} wajib diisi`)
+        if (text.length > 180 || /[\r\n\t]/.test(text)) throw invalid(`${label} maksimal 180 karakter dan harus satu baris`)
+        changes[id] = text
+      } else if (original.editableDateFields.has(id)) {
+        const text = paragraphText(current)
+        const { prefix, label } = original.editableDateFields.get(id)
+        if (!text.startsWith(prefix) || !isIndonesianDate(text.slice(prefix.length))) throw invalid(`${label} harus menggunakan format tanggal yang benar`)
         changes[id] = text
       } else if (paragraphText(current) !== paragraphText(paragraph)) throw invalid('Bagian tetap pada surat tidak boleh diubah')
     }
@@ -186,7 +227,7 @@ async function generateNativeLetter(requirement, draft, input, { templateMode = 
     current.parentNode.replaceChild(edited.document.importNode(paragraph, true), current)
   }
   // Fill-only citizen templates retain all original formatting, not uploaded markup.
-  if (!templateMode && original.editableFields.size) {
+  if (!templateMode && original.editableFields.size && !original.editableDateFields.size) {
     return generateLetter(requirement, { version: draft.version, confirmed: true, changes })
   }
   // A header's image relationship must not be retargeted by an uploaded document.

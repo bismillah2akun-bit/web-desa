@@ -42,6 +42,7 @@ const navigation = [
   ["guestbook", "Buku tamu", BookOpen, "Catatan kunjungan ke kantor desa"],
   ["contacts", "Pesan warga", Mail, "Baca dan tindak lanjuti pesan masuk"],
   ["officials", "Perangkat desa", Users, "Kelola struktur pemerintahan"],
+  ["areas", "Data RT/RW", MapPinned, "Kelola rekap unit wilayah RT dan RW"],
   [
     "profile",
     "Profil & penduduk",

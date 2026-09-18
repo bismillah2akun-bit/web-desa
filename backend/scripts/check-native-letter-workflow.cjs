@@ -42,7 +42,7 @@ async function run() {
   zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
   zip.file('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
   const p = (text, i) => `<w:p w14:paraId="${(i + 1).toString(16).padStart(8, '0')}"><w:r><w:t>${text}</w:t></w:r></w:p>`
-  zip.file('word/document.xml', `<w:document xmlns:w="${W}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body>${['PEMERINTAH DESA UJI', 'KECAMATAN UJI', 'DESA UJI', 'Sekretariat Desa Uji', 'SURAT UJI OTOMATIS', '[[Nama]]'].map(p).join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>`)
+  zip.file('word/document.xml', `<w:document xmlns:w="${W}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body>${['PEMERINTAH DESA UJI', 'KECAMATAN UJI', 'DESA UJI', 'Sekretariat Desa Uji', 'SURAT UJI OTOMATIS', 'Tanjungjaya, 18 September 2026', '[[Nama]]'].map(p).join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>`)
   const original = await zip.generateAsync({ type: 'nodebuffer' })
   const create = form({ name: 'QA native letters', requirements: [
     { label: 'Surat utama', field_type: 'file', is_required: true, is_letter: true, accepted_formats: 'docx' },
@@ -57,13 +57,13 @@ async function run() {
   let publicDoc, edited, draft
   await check('Admin upload/create, native preview and source unchanged', async () => {
     publicDoc = (await (await status(await call(`/services/${service.id}/templates/${main.id}/editor?native=1`), 200)).json()).data
-    assert.ok(publicDoc.docx); assert.deepEqual(publicDoc.fields, ['Nama'])
+    assert.ok(publicDoc.docx); assert.deepEqual(publicDoc.fields, ['Nama']); assert.deepEqual(publicDoc.dateFields, ['Tanggal surat'])
     const fetched = await call(`/services/${service.id}/templates/${main.id}`)
     assert.ok(Buffer.from(await fetched.arrayBuffer()).equals(original))
   })
   if (!publicDoc) throw new Error('Cannot continue without native preview')
   const bytes = Buffer.from(publicDoc.docx, 'base64')
-  edited = await changeText(bytes, '[[Nama]]', 'Warga QA & Keluarga')
+  edited = await changeText(await changeText(bytes, 'Tanjungjaya, 18 September 2026', 'Tanjungjaya, 19 September 2026'), '[[Nama]]', 'Warga QA & Keluarga')
   draft = { version: publicDoc.version, confirmed: true, format: 'docx' }
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
   function submission({ content = edited, metadata = draft, second = false, duplicate = false, omitFile = false, omitKtp = false } = {}) {
@@ -92,6 +92,7 @@ async function run() {
   await rejected('Reject corrupt DOCX + cleanup', submission({ content: Buffer.from('not a docx') }))
   await rejected('Reject altered letterhead', submission({ content: await changeText(edited, 'PEMERINTAH DESA UJI', 'KOP DIUBAH') }))
   await rejected('Reject altered fixed content', submission({ content: await changeText(edited, 'SURAT UJI OTOMATIS', 'JUDUL DIUBAH') }))
+  await rejected('Reject invalid signing date', submission({ content: await changeText(edited, 'Tanjungjaya, 19 September 2026', 'Tanjungjaya, kapan saja') }))
   await rejected('Reject field over 180 characters', submission({ content: await changeText(bytes, '[[Nama]]', 'a'.repeat(181)) }))
   const macro = await Zip.loadAsync(edited); macro.file('word/vbaProject.bin', 'test')
   await rejected('Reject macro document', submission({ content: await macro.generateAsync({ type: 'nodebuffer' }) }))
@@ -109,6 +110,7 @@ async function run() {
         const output = await Zip.loadAsync(data)
         const xml = new DOMParser().parseFromString(await output.file('word/document.xml').async('string'), 'application/xml')
         assert.ok(xml.documentElement.textContent.includes('Warga QA & Keluarga'))
+        assert.ok(xml.documentElement.textContent.includes('Tanjungjaya, 19 September 2026'))
         assert.ok(xml.documentElement.textContent.includes('PEMERINTAH DESA UJI'))
         assert.ok(!xml.documentElement.textContent.includes('[[Nama]]'))
       } else assert.ok(data.equals(png))

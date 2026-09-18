@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const contentModel = require('../models/contentModel')
-const { potentialsDirectory, profileDirectory } = require('../config/storage')
+const { potentialsDirectory, profileDirectory, areasDirectory } = require('../config/storage')
 const AppError = require('../utils/AppError')
 const { sendSuccess } = require('../utils/apiResponse')
 const { cleanText } = require('../utils/validation')
@@ -119,6 +119,15 @@ function parseArea(body) {
   }
 }
 
+function removeUploadedAreaPhoto(photoUrl) {
+  if (!photoUrl?.startsWith('/uploads/areas/')) return
+  fs.rmSync(path.join(areasDirectory, path.basename(photoUrl)), { force: true })
+}
+
+function parseAreaWithPhoto(body, photoUrl) {
+  return { ...parseArea(body), photoUrl }
+}
+
 function removeUploadedPotential(imageUrl) {
   if (!imageUrl || !imageUrl.startsWith('/uploads/potentials/')) return
   fs.rmSync(path.join(potentialsDirectory, path.basename(imageUrl)), { force: true })
@@ -183,31 +192,86 @@ async function deletePotential(req, res) {
 }
 
 async function createArea(req, res) {
+  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
   try {
-    const data = await contentModel.createAdministrativeArea(parseArea(req.body))
+    const data = await contentModel.createAdministrativeArea(parseAreaWithPhoto(req.body, uploadedPhoto))
     return sendSuccess(res, { data, status: 201, message: 'Data RT/RW berhasil ditambahkan' })
   } catch (error) {
+    removeUploadedAreaPhoto(uploadedPhoto)
     if (error.code === 'ER_DUP_ENTRY') throw new AppError('Kombinasi RW dan RT tersebut sudah tersedia', 400)
     throw error
   }
 }
 
 async function updateArea(req, res) {
+  const current = (await contentModel.findDemographics()).areas.find((area) => String(area.id) === String(req.params.id))
+  if (!current) {
+    if (req.file) removeUploadedAreaPhoto(`/uploads/areas/${req.file.filename}`)
+    throw new AppError('Data RT/RW tidak ditemukan', 404)
+  }
+  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
+  const removeRequested = String(req.body.remove_photo) === 'true'
+  const photoUrl = uploadedPhoto || (removeRequested ? null : current.photo_url)
   try {
-    const data = await contentModel.updateAdministrativeArea(req.params.id, parseArea(req.body))
+    const data = await contentModel.updateAdministrativeArea(req.params.id, parseAreaWithPhoto(req.body, photoUrl))
     if (!data) throw new AppError('Data RT/RW tidak ditemukan', 404)
+    if ((uploadedPhoto || removeRequested) && current.photo_url !== photoUrl) removeUploadedAreaPhoto(current.photo_url)
     return sendSuccess(res, { data, message: 'Data RT/RW berhasil diperbarui' })
   } catch (error) {
+    removeUploadedAreaPhoto(uploadedPhoto)
     if (error.code === 'ER_DUP_ENTRY') throw new AppError('Kombinasi RW dan RT tersebut sudah tersedia', 400)
     throw error
   }
 }
 
 async function deleteArea(req, res) {
-  if (!await contentModel.deleteAdministrativeArea(req.params.id)) {
+  const current = (await contentModel.findDemographics()).areas.find((area) => String(area.id) === String(req.params.id))
+  if (!current || !await contentModel.deleteAdministrativeArea(req.params.id)) {
     throw new AppError('Data RT/RW tidak ditemukan', 404)
   }
+  removeUploadedAreaPhoto(current.photo_url)
   return sendSuccess(res, { message: 'Data RT/RW berhasil dihapus' })
 }
 
-module.exports = { updateProfile, updateDemographics, createArea, updateArea, deleteArea, createPotential, updatePotential, deletePotential }
+function parseNeighborhoodOfficial(body, photoUrl) {
+  const level = cleanText(body.level, 5).toLowerCase()
+  const number = cleanText(body.number, 10)
+  const name = cleanText(body.name, 180)
+  if (!['rw', 'rt'].includes(level) || !number || !name) throw new AppError('Jenis, nomor, dan nama pengurus wajib diisi', 400)
+  return { level, number, name, photoUrl, sortOrder: nullableInteger(body.sort_order, 'Urutan tampil') || 0, isActive: String(body.is_active) !== 'false' }
+}
+
+async function getNeighborhoodOfficials(_req, res) {
+  return sendSuccess(res, { data: await contentModel.findNeighborhoodOfficials() })
+}
+
+async function getPublicNeighborhoodOfficials(_req, res) {
+  return sendSuccess(res, { data: await contentModel.findNeighborhoodOfficials({ activeOnly: true }) })
+}
+
+async function createNeighborhoodOfficial(req, res) {
+  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
+  try { return sendSuccess(res, { data: await contentModel.createNeighborhoodOfficial(parseNeighborhoodOfficial(req.body, uploadedPhoto)), status: 201, message: 'Pengurus RT/RW berhasil ditambahkan' }) }
+  catch (error) { removeUploadedAreaPhoto(uploadedPhoto); if (error.code === 'ER_DUP_ENTRY') throw new AppError('Pengurus untuk nomor tersebut sudah ada', 400); throw error }
+}
+
+async function updateNeighborhoodOfficial(req, res) {
+  const current = (await contentModel.findNeighborhoodOfficials()).find((item) => String(item.id) === String(req.params.id))
+  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
+  if (!current) { removeUploadedAreaPhoto(uploadedPhoto); throw new AppError('Pengurus RT/RW tidak ditemukan', 404) }
+  const photoUrl = uploadedPhoto || (String(req.body.remove_photo) === 'true' ? null : current.photo_url)
+  try {
+    const data = await contentModel.updateNeighborhoodOfficial(req.params.id, parseNeighborhoodOfficial(req.body, photoUrl))
+    if (uploadedPhoto || photoUrl === null) removeUploadedAreaPhoto(current.photo_url)
+    return sendSuccess(res, { data, message: 'Pengurus RT/RW berhasil diperbarui' })
+  } catch (error) { removeUploadedAreaPhoto(uploadedPhoto); if (error.code === 'ER_DUP_ENTRY') throw new AppError('Pengurus untuk nomor tersebut sudah ada', 400); throw error }
+}
+
+async function deleteNeighborhoodOfficial(req, res) {
+  const current = (await contentModel.findNeighborhoodOfficials()).find((item) => String(item.id) === String(req.params.id))
+  if (!current || !await contentModel.deleteNeighborhoodOfficial(req.params.id)) throw new AppError('Pengurus RT/RW tidak ditemukan', 404)
+  removeUploadedAreaPhoto(current.photo_url)
+  return sendSuccess(res, { message: 'Pengurus RT/RW berhasil dihapus' })
+}
+
+module.exports = { updateProfile, updateDemographics, createArea, updateArea, deleteArea, getNeighborhoodOfficials, getPublicNeighborhoodOfficials, createNeighborhoodOfficial, updateNeighborhoodOfficial, deleteNeighborhoodOfficial, createPotential, updatePotential, deletePotential }

@@ -11,6 +11,7 @@ const newsDirectory = path.join(publicDirectory, 'news')
 const potentialsDirectory = path.join(publicDirectory, 'potentials')
 const profileDirectory = path.join(publicDirectory, 'profile')
 const officialsDirectory = path.join(publicDirectory, 'officials')
+const areasDirectory = path.join(publicDirectory, 'areas')
 
 module.exports = {
   storageRoot,
@@ -21,4 +22,5 @@ module.exports = {
   potentialsDirectory,
   profileDirectory,
   officialsDirectory,
+  areasDirectory,
 }

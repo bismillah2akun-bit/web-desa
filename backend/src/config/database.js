@@ -73,6 +73,22 @@ async function initializeDatabase() {
   if (!officialPhotoColumn.length) {
     await pool.query('ALTER TABLE government_officials ADD COLUMN photo_url TEXT NULL AFTER description')
   }
+  const [areaPhotoColumn] = await pool.query("SHOW COLUMNS FROM administrative_areas LIKE 'photo_url'")
+  if (!areaPhotoColumn.length) {
+    await pool.query('ALTER TABLE administrative_areas ADD COLUMN photo_url TEXT NULL AFTER status')
+  }
+  await pool.query(`CREATE TABLE IF NOT EXISTS neighborhood_officials (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    level ENUM('rw','rt') NOT NULL,
+    number VARCHAR(10) NOT NULL,
+    name VARCHAR(180) NOT NULL,
+    photo_url TEXT NULL,
+    sort_order INT UNSIGNED DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_neighborhood_official (level, number)
+  ) ENGINE=InnoDB`)
   await pool.query(`UPDATE village_profile
     SET welcome_title = COALESCE(NULLIF(welcome_title, ''), 'Bersama membangun desa yang terbuka dan berdaya'),
         welcome_message = COALESCE(NULLIF(welcome_message, ''), 'Selamat datang di portal Desa Tanjungjaya. Website ini disiapkan sebagai ruang informasi, pengenalan potensi, dan akses layanan bagi warga.')

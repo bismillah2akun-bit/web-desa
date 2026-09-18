@@ -106,6 +106,7 @@ export default function LetterEditor({ serviceId, requirement, draft, onDraftCha
           </div>
           <div className="letter-editor-tip"><ShieldCheck size={20} /><p>Kop surat dikunci dan ukuran halaman asli dipertahankan. Perubahan isi disimpan sebagai DOCX, bukan hasil konversi halaman HTML.</p></div>
           {!templateMode && documentData?.fields?.length > 0 && <p className="letter-editor-note">Ganti penanda berikut dengan data Anda: {documentData.fields.map((field) => `[[${field}]]`).join(", ")}. Bagian tetap surat tidak dapat diubah.</p>}
+          {!templateMode && documentData?.dateFields?.length > 0 && <p className="letter-editor-note">Baris tanggal surat dapat diisi langsung pada dokumen. Gunakan format <b>18 September 2026</b> atau <b>18/09/2026</b>.</p>}
           <p className="letter-editor-note">{templateMode ? "Periksa seluruh halaman dan hapus data pribadi warga sebelum template dipublikasikan. Berkas sumber tidak ikut diubah." : "Nomor surat, tanda tangan, dan pengesahan tetap menjadi kewenangan petugas desa."}</p>
           <label className="letter-editor-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={busy || !ready} /><span>{templateMode ? "Template sudah saya periksa dan tidak memuat data pribadi warga." : "Saya sudah memeriksa isian surat ini."}</span></label>
           {saveError && <p role="alert" className="letter-editor-warning">{saveError}</p>}
