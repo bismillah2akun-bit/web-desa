@@ -36,6 +36,7 @@ const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingm
 function ApplicationDocumentViewer({ file, onClose }) {
   const [documentBytes, setDocumentBytes] = useState(null);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`${API}/admin/application-files/${file.id}`, { credentials: "include", signal: controller.signal })
@@ -61,6 +62,18 @@ function ApplicationDocumentViewer({ file, onClose }) {
       document.removeEventListener("keydown", close);
     };
   }, [onClose]);
+  async function download() {
+    setDownloading(true);
+    try {
+      const response = await fetch(`${API}/admin/application-files/${file.id}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Surat tidak dapat diunduh");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url; link.download = file.original_name || "surat-warga.docx"; link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) { setError(err.message); }
+    finally { setDownloading(false); }
+  }
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex h-dvh w-screen max-w-none flex-col overflow-hidden rounded-none bg-[#f3f4f6] p-0 shadow-none" role="dialog" aria-modal="true" aria-labelledby="application-document-title">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-stone-200 bg-white px-4 py-3 md:px-6">
@@ -70,13 +83,13 @@ function ApplicationDocumentViewer({ file, onClose }) {
           <p className="truncate text-xs text-stone-500">{file.original_name}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <a href={`${API}/admin/application-files/${file.id}`} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-bold text-forest-900">
-            <Download size={15} /> <span className="hidden sm:inline">Unduh DOCX</span>
-          </a>
+          <button type="button" disabled={downloading} onClick={download} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-bold text-forest-900 disabled:opacity-60">
+            {downloading ? <LoaderCircle className="animate-spin" size={15} /> : <Download size={15} />} <span className="hidden sm:inline">{downloading ? "Mengunduh…" : "Unduh DOCX"}</span>
+          </button>
           <button type="button" onClick={onClose} aria-label="Tutup pratinjau" className="rounded-xl border border-stone-200 p-2 text-stone-600"><X size={18} /></button>
         </div>
       </header>
-      <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col p-2 md:p-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[2200px] flex-1 flex-col p-0 md:p-2">
         {error ? <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center text-sm text-red-700">{error}</div>
           : !documentBytes ? <div className="grid h-full place-items-center text-sm text-stone-500"><span className="flex items-center gap-2"><LoaderCircle className="animate-spin" size={18} /> Membuka surat…</span></div>
           : <ApplicationDocxPreview documentBytes={documentBytes} filename={file.original_name} />}
@@ -116,6 +129,7 @@ export default function AdminApplications() {
   const [selected, setSelected] = useState(null);
   const [notice, setNotice] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
+  const [downloadingFile, setDownloadingFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -150,6 +164,29 @@ export default function AdminApplications() {
       setSelected(await api(`/admin/applications/${item.id}`));
     } catch (error) {
       setNotice(error.message);
+    }
+  }
+
+  async function downloadFile(file) {
+    setDownloadingFile(file.id);
+    try {
+      const response = await fetch(`${API}/admin/application-files/${file.id}`, { credentials: "include" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || "Dokumen tidak dapat diunduh");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.original_name || "dokumen-pengajuan";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setDownloadingFile(null);
     }
   }
 
@@ -298,7 +335,7 @@ export default function AdminApplications() {
                         </div>
                         <div className="mt-4 flex gap-2">
                           {file.mime_type === DOCX_MIME && <button type="button" onClick={() => setPreviewFile(file)} className="inline-flex items-center gap-1.5 rounded-lg bg-forest-900 px-3 py-2 text-xs font-bold text-white"><Eye size={14} /> Lihat surat</button>}
-                          <a href={`${API}/admin/application-files/${file.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-forest-900"><Download size={14} /> Unduh</a>
+                          <button type="button" disabled={downloadingFile === file.id} onClick={() => downloadFile(file)} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-forest-900 disabled:opacity-60">{downloadingFile === file.id ? <LoaderCircle className="animate-spin" size={14} /> : <Download size={14} />}{downloadingFile === file.id ? "Mengunduh…" : "Unduh"}</button>
                         </div>
                       </div>
                     ))}

@@ -15,11 +15,13 @@ Database kosong akan dibuatkan tabel secara otomatis saat aplikasi pertama kali 
 
 ## 3. Simpan file upload secara permanen
 
-1. Buka service aplikasi lalu tambahkan **Volume**.
+1. Buka service aplikasi lalu tambahkan **Volume**. Ini wajib untuk fitur unduh surat/lampiran pengajuan.
 2. Atur mount path volume menjadi `/data`.
 3. Pastikan variable `STORAGE_PATH=/data` sudah tersedia.
 
 Tanpa Volume, gambar berita, template surat layanan, dan dokumen pengajuan dapat hilang saat Railway melakukan redeploy. Template disimpan di `/data/private/templates` jika `STORAGE_PATH=/data`.
+
+> Penting: berkas yang sudah terlanjur hilang sebelum Volume dipasang tidak bisa dipulihkan dari database karena database hanya menyimpan nama berkas, bukan isi DOCX. Pengajuan baru setelah Volume aktif akan aman.
 
 ## 4. Generate domain
 

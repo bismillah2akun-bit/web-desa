@@ -137,6 +137,11 @@ async function downloadApplicationFile(req, res, next) {
   const file = await applicationModel.findFile(req.params.id)
   if (!file) throw new AppError('Dokumen tidak ditemukan', 404)
   const filePath = path.join(privateDirectory, path.basename(file.stored_name))
+  try {
+    await fs.access(filePath)
+  } catch {
+    throw new AppError('Berkas surat tidak tersedia di penyimpanan server. Untuk Railway, pasang Volume pada /data dan set STORAGE_PATH=/data agar surat tidak hilang setelah redeploy.', 410)
+  }
   return res.download(filePath, file.original_name, (error) => {
     if (error && !res.headersSent) next(new AppError('Dokumen tidak dapat dibuka', 404))
   })

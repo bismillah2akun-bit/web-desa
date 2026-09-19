@@ -102,6 +102,21 @@ function paragraphText(paragraph) {
   return result
 }
 
+function applyOfficialLetterFont(document) {
+  // Keep the resulting DOCX consistent across Word, LibreOffice and the web
+  // preview, even when the uploaded template used an unavailable default font.
+  for (const run of elements(document, 'r')) {
+    let properties = children(run).find((child) => child.namespaceURI === W && child.localName === 'rPr')
+    if (!properties) {
+      properties = document.createElementNS(W, 'w:rPr')
+      run.insertBefore(properties, run.firstChild)
+    }
+    let fonts = children(properties).find((child) => child.namespaceURI === W && child.localName === 'rFonts')
+    if (!fonts) { fonts = document.createElementNS(W, 'w:rFonts'); properties.insertBefore(fonts, properties.firstChild) }
+    for (const name of ['ascii', 'hAnsi', 'eastAsia', 'cs']) fonts.setAttributeNS(W, `w:${name}`, 'Times New Roman')
+  }
+}
+
 function letterheadIds(records) {
   const rows = [...records];
   const start = rows.findIndex(([, node]) => /^PEMERINTAH\s+(KABUPATEN|KOTA|DESA|PROVINSI)\b/i.test(paragraphText(node).trim()))
@@ -251,6 +266,7 @@ async function generateNativeLetter(requirement, draft, input, { templateMode = 
     while (content.firstChild) wrapper.parentNode.insertBefore(content.firstChild, wrapper)
     wrapper.parentNode.removeChild(wrapper)
   }
+  applyOfficialLetterFont(edited.document)
   edited.zip.file('word/document.xml', serialize(edited.document))
   const buffer = await edited.zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   const filename = `${crypto.randomUUID()}.docx`
@@ -369,6 +385,7 @@ async function generateLetter(requirement, draft, { templateMode = false } = {})
       cursor = node
     }
   }
+  applyOfficialLetterFont(loaded.document)
   loaded.zip.file('word/document.xml', new XMLSerializer().serializeToString(loaded.document))
   const buffer = await loaded.zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   if (buffer.length > 20 * 1024 * 1024) throw invalid('Hasil surat terlalu besar')
