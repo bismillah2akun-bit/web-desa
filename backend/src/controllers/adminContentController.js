@@ -233,45 +233,4 @@ async function deleteArea(req, res) {
   return sendSuccess(res, { message: 'Data RT/RW berhasil dihapus' })
 }
 
-function parseNeighborhoodOfficial(body, photoUrl) {
-  const level = cleanText(body.level, 5).toLowerCase()
-  const number = cleanText(body.number, 10)
-  const name = cleanText(body.name, 180)
-  if (!['rw', 'rt'].includes(level) || !number || !name) throw new AppError('Jenis, nomor, dan nama pengurus wajib diisi', 400)
-  return { level, number, name, photoUrl, sortOrder: nullableInteger(body.sort_order, 'Urutan tampil') || 0, isActive: String(body.is_active) !== 'false' }
-}
-
-async function getNeighborhoodOfficials(_req, res) {
-  return sendSuccess(res, { data: await contentModel.findNeighborhoodOfficials() })
-}
-
-async function getPublicNeighborhoodOfficials(_req, res) {
-  return sendSuccess(res, { data: await contentModel.findNeighborhoodOfficials({ activeOnly: true }) })
-}
-
-async function createNeighborhoodOfficial(req, res) {
-  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
-  try { return sendSuccess(res, { data: await contentModel.createNeighborhoodOfficial(parseNeighborhoodOfficial(req.body, uploadedPhoto)), status: 201, message: 'Pengurus RT/RW berhasil ditambahkan' }) }
-  catch (error) { removeUploadedAreaPhoto(uploadedPhoto); if (error.code === 'ER_DUP_ENTRY') throw new AppError('Pengurus untuk nomor tersebut sudah ada', 400); throw error }
-}
-
-async function updateNeighborhoodOfficial(req, res) {
-  const current = (await contentModel.findNeighborhoodOfficials()).find((item) => String(item.id) === String(req.params.id))
-  const uploadedPhoto = req.file ? `/uploads/areas/${req.file.filename}` : null
-  if (!current) { removeUploadedAreaPhoto(uploadedPhoto); throw new AppError('Pengurus RT/RW tidak ditemukan', 404) }
-  const photoUrl = uploadedPhoto || (String(req.body.remove_photo) === 'true' ? null : current.photo_url)
-  try {
-    const data = await contentModel.updateNeighborhoodOfficial(req.params.id, parseNeighborhoodOfficial(req.body, photoUrl))
-    if (uploadedPhoto || photoUrl === null) removeUploadedAreaPhoto(current.photo_url)
-    return sendSuccess(res, { data, message: 'Pengurus RT/RW berhasil diperbarui' })
-  } catch (error) { removeUploadedAreaPhoto(uploadedPhoto); if (error.code === 'ER_DUP_ENTRY') throw new AppError('Pengurus untuk nomor tersebut sudah ada', 400); throw error }
-}
-
-async function deleteNeighborhoodOfficial(req, res) {
-  const current = (await contentModel.findNeighborhoodOfficials()).find((item) => String(item.id) === String(req.params.id))
-  if (!current || !await contentModel.deleteNeighborhoodOfficial(req.params.id)) throw new AppError('Pengurus RT/RW tidak ditemukan', 404)
-  removeUploadedAreaPhoto(current.photo_url)
-  return sendSuccess(res, { message: 'Pengurus RT/RW berhasil dihapus' })
-}
-
-module.exports = { updateProfile, updateDemographics, createArea, updateArea, deleteArea, getNeighborhoodOfficials, getPublicNeighborhoodOfficials, createNeighborhoodOfficial, updateNeighborhoodOfficial, deleteNeighborhoodOfficial, createPotential, updatePotential, deletePotential }
+module.exports = { updateProfile, updateDemographics, createArea, updateArea, deleteArea, createPotential, updatePotential, deletePotential }

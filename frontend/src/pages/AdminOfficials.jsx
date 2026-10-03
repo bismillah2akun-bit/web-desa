@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, ImagePlus, Plus, Save, Trash2, Users, X } from "lucide-react";
+import { Edit3, ImagePlus, Plus, Save, Settings2, Trash2, Users, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/components/confirmContext";
+import { DEFAULT_CATEGORY, categoryConfig } from "@/lib/officialCategories";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const emptyForm = {
+  category: DEFAULT_CATEGORY,
   position: "",
   name: "",
   description: "",
@@ -13,6 +15,7 @@ const emptyForm = {
   sort_order: 0,
   is_active: true,
 };
+const emptyCategoryForm = { name: "", title: "", description: "" };
 const mediaUrl = (value) => value?.startsWith("/uploads/")
   ? `${new URL(API, window.location.origin).origin}${value}`
   : value;
@@ -22,6 +25,11 @@ export default function AdminOfficials() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(DEFAULT_CATEGORY);
+  const [categoryForm, setCategoryForm] = useState(null);
+  const [categoryEditingId, setCategoryEditingId] = useState(null);
+  const [categorySaving, setCategorySaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
@@ -37,26 +45,35 @@ export default function AdminOfficials() {
         if (response.status === 401)
           return navigate("/admin/login", { replace: true });
         if (!response.ok)
-          throw new Error("Data perangkat desa belum dapat dimuat");
+          throw new Error("Data belum dapat dimuat");
         setItems((await response.json()).data);
       })
       .catch((error) => setNotice(error.message));
   }, [navigate]);
 
+  useEffect(() => {
+    fetch(`${API}/official-categories`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((body) => setCategories(body.data || []))
+      .catch(() => setNotice("Daftar lembaga belum dapat dimuat"));
+  }, []);
+
   function change(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function reset() {
+  function reset(category = activeCategory) {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, category });
     setPhotoFile(null);
     setPhotoRevision((value) => value + 1);
   }
 
   function edit(item) {
     setEditingId(item.id);
+    setActiveCategory(item.category || DEFAULT_CATEGORY);
     setForm({
+      category: item.category || DEFAULT_CATEGORY,
       position: item.position || "",
       name: item.name || "",
       description: item.description || "",
@@ -95,20 +112,22 @@ export default function AdminOfficials() {
         return next.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
       });
       setNotice(body.message);
-      reset();
+      setActiveCategory(form.category);
+      reset(form.category);
     } catch (error) {
-      setNotice(error.message || "Data perangkat desa belum dapat disimpan");
+      setNotice(error.message || "Data belum dapat disimpan");
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(item) {
+    const itemConfig = categoryConfig(categories, item.category);
     confirm({
-      title: "Hapus perangkat desa?",
+      title: `Hapus ${itemConfig.singular}?`,
       itemName: `${item.position}${item.name ? ` — ${item.name}` : ""}`,
       description:
-        "Data perangkat desa akan dihapus permanen dari struktur pemerintahan.",
+        "Data akan dihapus permanen dan tidak lagi tampil pada halaman pemerintahan.",
       onConfirm: async () => {
         const response = await fetch(`${API}/admin/officials/${item.id}`, {
           method: "DELETE",
@@ -127,6 +146,97 @@ export default function AdminOfficials() {
       },
     });
   }
+
+  function selectTab(value) {
+    setActiveCategory(value);
+    setCategoryForm(null);
+    if (!editingId) change("category", value);
+  }
+
+  function openAddCategory() {
+    setCategoryEditingId(null);
+    setCategoryForm(emptyCategoryForm);
+  }
+
+  function openEditCategory() {
+    const current = categories.find((item) => item.slug === activeCategory);
+    if (!current) return;
+    setCategoryEditingId(current.id);
+    setCategoryForm({
+      name: current.name || "",
+      title: current.title || "",
+      description: current.description || "",
+    });
+  }
+
+  async function submitCategory(event) {
+    event.preventDefault();
+    setCategorySaving(true);
+    setNotice("");
+    try {
+      const response = await fetch(
+        `${API}/admin/official-categories${categoryEditingId ? `/${categoryEditingId}` : ""}`,
+        {
+          method: categoryEditingId ? "PUT" : "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(categoryForm),
+        },
+      );
+      const body = await response.json();
+      if (response.status === 401)
+        return navigate("/admin/login", { replace: true });
+      if (!response.ok) throw new Error(body.message);
+      setCategories((current) =>
+        categoryEditingId
+          ? current.map((item) => (item.id === categoryEditingId ? body.data : item))
+          : [...current, body.data],
+      );
+      setActiveCategory(body.data.slug);
+      if (!editingId) change("category", body.data.slug);
+      setCategoryForm(null);
+      setCategoryEditingId(null);
+      setNotice(body.message);
+    } catch (error) {
+      setNotice(error.message || "Lembaga belum dapat disimpan");
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  function removeCategory() {
+    const current = categories.find((item) => item.slug === activeCategory);
+    if (!current) return;
+    confirm({
+      title: "Hapus lembaga?",
+      itemName: current.name,
+      description:
+        "Lembaga akan dihapus dari daftar. Lembaga yang masih memiliki data tidak bisa dihapus, jadi pindahkan atau hapus dulu datanya.",
+      onConfirm: async () => {
+        const response = await fetch(`${API}/admin/official-categories/${current.id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const body = await response.json();
+        if (!response.ok)
+          throw new Error(
+            response.status === 401
+              ? "Sesi berakhir. Silakan login kembali."
+              : body.message,
+          );
+        setCategories((list) => list.filter((item) => item.id !== current.id));
+        setActiveCategory(DEFAULT_CATEGORY);
+        if (!editingId) change("category", DEFAULT_CATEGORY);
+        setCategoryForm(null);
+        setNotice(body.message);
+      },
+    });
+  }
+
+  const config = categoryConfig(categories, activeCategory);
+  const formConfig = categoryConfig(categories, form.category);
+  const inCategory = (item, value) => (item.category || DEFAULT_CATEGORY) === value;
+  const visibleItems = items.filter((item) => inCategory(item, activeCategory));
 
   return (
     <main className="min-h-screen bg-sage-50">
@@ -147,7 +257,7 @@ export default function AdminOfficials() {
               </span>
               <div>
                 <h1 className="font-serif text-2xl text-forest-950">
-                  {editingId ? "Edit perangkat desa" : "Tambah perangkat desa"}
+                  {editingId ? `Edit ${formConfig.singular}` : `Tambah ${formConfig.singular}`}
                 </h1>
                 <p className="text-sm text-stone-500">
                   Isi nama dan jabatan yang tampil kepada warga.
@@ -156,11 +266,26 @@ export default function AdminOfficials() {
             </div>
             <div className="mt-7 space-y-5">
               <label className="block">
+                <span className="text-sm font-semibold">Kategori</span>
+                <select
+                  value={form.category}
+                  onChange={(e) => change("category", e.target.value)}
+                  className="mt-2 w-full rounded-xl border bg-white px-3 py-3"
+                >
+                  {categories.map((option) => (
+                    <option key={option.slug} value={option.slug}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
                 <span className="text-sm font-semibold">Jabatan *</span>
                 <input
                   required
                   value={form.position}
                   onChange={(e) => change("position", e.target.value)}
+                  placeholder={formConfig.positionHint}
                   className="mt-2 w-full rounded-xl border px-3 py-3"
                 />
               </label>
@@ -179,16 +304,16 @@ export default function AdminOfficials() {
                   rows="4"
                   value={form.description}
                   onChange={(e) => change("description", e.target.value)}
-                  placeholder="Contoh: Periode jabatan atau bidang pelayanan"
+                  placeholder={formConfig.descriptionHint}
                   className="mt-2 w-full rounded-xl border p-3"
                 />
               </label>
               <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-forest-900"><ImagePlus size={18} /></span>
-                  <div><p className="text-sm font-bold text-forest-950">Foto perangkat desa</p><p className="text-xs text-stone-500">JPG, PNG, atau WEBP · maksimal 5 MB</p></div>
+                  <div><p className="text-sm font-bold text-forest-950">Foto</p><p className="text-xs text-stone-500">JPG, PNG, atau WEBP · maksimal 5 MB</p></div>
                 </div>
-                {photoPreview && <div className="mt-4 overflow-hidden rounded-xl bg-stone-200"><img src={photoPreview} alt="Pratinjau perangkat desa" className="h-56 w-full object-cover object-top" /></div>}
+                {photoPreview && <div className="mt-4 overflow-hidden rounded-xl bg-stone-200"><img src={photoPreview} alt="Pratinjau foto" className="h-56 w-full object-cover object-top" /></div>}
                 <input key={photoRevision} type="file" accept="image/jpeg,image/png,image/webp" className="mt-4 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-forest-900" onChange={(event) => {
                   const file = event.target.files?.[0] || null;
                   if (file && file.size > 5 * 1024 * 1024) {
@@ -234,7 +359,7 @@ export default function AdminOfficials() {
               {editingId && (
                 <button
                   type="button"
-                  onClick={reset}
+                  onClick={() => reset()}
                   className="rounded-xl border px-5 py-3 text-sm font-bold"
                 >
                   Batal
@@ -244,13 +369,130 @@ export default function AdminOfficials() {
           </form>
           <section>
             <p className="text-xs font-bold uppercase tracking-[.2em] text-earth-500">
-              Pemerintahan Desa
+              {config.eyebrow}
             </p>
             <h2 className="mt-3 font-serif text-4xl text-forest-950">
-              Perangkat desa
+              {config.title}
             </h2>
+            <div
+              className="mt-5 flex flex-wrap gap-2"
+              role="tablist"
+              aria-label="Kategori struktur desa"
+            >
+              {categories.map((option) => {
+                const selected = option.slug === activeCategory;
+                const count = items.filter((item) => inCategory(item, option.slug)).length;
+                return (
+                  <button
+                    key={option.slug}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => selectTab(option.slug)}
+                    className={`rounded-full border px-4 py-2 text-sm font-bold transition ${selected ? "border-forest-900 bg-forest-900 text-white" : "border-sage-200 bg-white text-forest-900 hover:bg-sage-100"}`}
+                  >
+                    {option.name}
+                    <span className={`ml-1.5 text-xs ${selected ? "text-white/80" : "text-stone-400"}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <button
+                type="button"
+                onClick={openAddCategory}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-forest-900 px-4 py-2 font-bold text-forest-900 hover:bg-sage-100"
+              >
+                <Plus size={15} /> Tambah lembaga
+              </button>
+              <button
+                type="button"
+                onClick={openEditCategory}
+                className="inline-flex items-center gap-1.5 font-semibold text-stone-600 hover:text-forest-900"
+              >
+                <Settings2 size={15} /> Ubah lembaga ini
+              </button>
+              {activeCategory !== DEFAULT_CATEGORY && (
+                <button
+                  type="button"
+                  onClick={removeCategory}
+                  className="inline-flex items-center gap-1.5 font-semibold text-red-700 hover:underline"
+                >
+                  <Trash2 size={15} /> Hapus lembaga ini
+                </button>
+              )}
+            </div>
+            {categoryForm && (
+              <form
+                onSubmit={submitCategory}
+                className="mt-4 rounded-2xl border border-sage-200 bg-white p-5"
+              >
+                <h3 className="font-serif text-xl text-forest-950">
+                  {categoryEditingId ? "Ubah lembaga" : "Tambah lembaga baru"}
+                </h3>
+                <div className="mt-4 space-y-4">
+                  <label className="block">
+                    <span className="text-sm font-semibold">Nama lembaga *</span>
+                    <input
+                      required
+                      maxLength={80}
+                      value={categoryForm.name}
+                      onChange={(e) => setCategoryForm((current) => ({ ...current, name: e.target.value }))}
+                      placeholder="Contoh: Posyandu, Kelompok Tani, Karang Werda"
+                      className="mt-2 w-full rounded-xl border bg-white px-3 py-3"
+                    />
+                    <span className="mt-1 block text-xs text-stone-500">
+                      Nama ini tampil sebagai tab di halaman admin.
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-semibold">Judul di halaman website</span>
+                    <input
+                      maxLength={150}
+                      value={categoryForm.title}
+                      onChange={(e) => setCategoryForm((current) => ({ ...current, title: e.target.value }))}
+                      placeholder="Kosongkan untuk memakai nama lembaga"
+                      className="mt-2 w-full rounded-xl border bg-white px-3 py-3"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-semibold">Keterangan singkat di website</span>
+                    <textarea
+                      rows={2}
+                      maxLength={1000}
+                      value={categoryForm.description}
+                      onChange={(e) => setCategoryForm((current) => ({ ...current, description: e.target.value }))}
+                      placeholder="Contoh: Pengurus Posyandu Desa Tanjungjaya."
+                      className="mt-2 w-full rounded-xl border bg-white px-3 py-3"
+                    />
+                  </label>
+                </div>
+                <div className="mt-5 flex gap-3">
+                  <button
+                    disabled={categorySaving}
+                    className="flex items-center gap-2 rounded-xl bg-forest-900 px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    <Save size={17} /> {categorySaving ? "Menyimpan..." : "Simpan lembaga"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryForm(null)}
+                    className="rounded-xl border px-5 py-3 text-sm font-bold"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            )}
             <div className="mt-7 space-y-3">
-              {items.map((item) => (
+              {!visibleItems.length && (
+                <p className="rounded-2xl border border-dashed border-sage-200 bg-white p-8 text-center text-sm text-stone-500">
+                  Belum ada data untuk lembaga ini. Tambahkan lewat formulir di sebelah kiri.
+                </p>
+              )}
+              {visibleItems.map((item) => (
                 <article
                   key={item.id}
                   className="flex flex-col gap-4 rounded-2xl border border-sage-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between"

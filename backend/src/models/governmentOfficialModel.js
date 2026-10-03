@@ -1,9 +1,17 @@
 const { pool: db } = require('../config/database')
 
-async function findAll({ publicOnly = false } = {}) {
-  const where = publicOnly ? 'WHERE is_active = TRUE' : ''
+async function findAll({ publicOnly = false, category = null } = {}) {
+  const conditions = []
+  const params = []
+  if (publicOnly) conditions.push('is_active = TRUE')
+  if (category) {
+    conditions.push('category = ?')
+    params.push(category)
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
   const [rows] = await db.query(
     `SELECT * FROM government_officials ${where} ORDER BY sort_order, id`,
+    params,
   )
   return rows
 }
@@ -15,9 +23,9 @@ async function findById(id) {
 
 async function create(item) {
   const [result] = await db.execute(
-    `INSERT INTO government_officials (position, name, description, photo_url, sort_order, is_active)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [item.position, item.name, item.description, item.photoUrl, item.sortOrder, item.isActive],
+    `INSERT INTO government_officials (category, position, name, description, photo_url, sort_order, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [item.category, item.position, item.name, item.description, item.photoUrl, item.sortOrder, item.isActive],
   )
   return findById(result.insertId)
 }
@@ -25,9 +33,9 @@ async function create(item) {
 async function update(id, item) {
   const [result] = await db.execute(
     `UPDATE government_officials
-     SET position = ?, name = ?, description = ?, photo_url = ?, sort_order = ?, is_active = ?
+     SET category = ?, position = ?, name = ?, description = ?, photo_url = ?, sort_order = ?, is_active = ?
      WHERE id = ?`,
-    [item.position, item.name, item.description, item.photoUrl, item.sortOrder, item.isActive, id],
+    [item.category, item.position, item.name, item.description, item.photoUrl, item.sortOrder, item.isActive, id],
   )
   return result.affectedRows ? findById(id) : null
 }

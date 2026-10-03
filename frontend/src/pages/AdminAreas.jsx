@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/components/confirmContext";
 
 import AdminDataTable, { StatusBadge } from "@/components/AdminDataTable";
-import NeighborhoodOfficialManager from "@/components/NeighborhoodOfficialManager";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const empty = {
@@ -262,7 +261,6 @@ export default function AdminAreas() {
           defaultSort={{ key: "area", direction: "asc" }} emptyMessage="Belum ada rincian RT/RW"
         />
       </div>
-      <NeighborhoodOfficialManager />
     </section>
   );
 }

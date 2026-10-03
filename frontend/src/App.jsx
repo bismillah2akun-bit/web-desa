@@ -48,7 +48,6 @@ import AdminNews from "@/pages/AdminNews";
 import AdminApplications from "@/pages/AdminApplications";
 import TrackApplication from "@/pages/TrackApplication";
 import AdminGuestbook from "@/pages/AdminGuestbook";
-import AdminAreas from "@/pages/AdminAreas";
 import AdminOfficials from "@/pages/AdminOfficials";
 import AdminContacts from "@/pages/AdminContacts";
 import AdminPotentials from "@/pages/AdminPotentials";
@@ -886,19 +885,61 @@ function Profile() {
     </Layout>
   );
 }
+function OfficialCards({ items }) {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((official, i) => (
+        <article
+          key={official.id}
+          className={`official-card${official.photo_url ? " official-card--photo" : ""}`}
+        >
+          {official.photo_url && <div className="official-card__photo" aria-hidden="true">
+            <img src={mediaUrl(official.photo_url)} alt="" loading="lazy" decoding="async" />
+          </div>}
+          <div className="official-card__content">
+          <div className="official-card__top" aria-hidden="true">
+            <span className="official-card__icon"><Users size={22} strokeWidth={1.6} /></span>
+            <span className="official-card__number">{String(i + 1).padStart(2, "0")}</span>
+          </div>
+          <div className="official-card__details">
+          <p className="official-card__position">
+            {official.position}
+          </p>
+          <h3 className="official-card__name">
+            {official.name || "Nama belum tersedia"}
+          </h3>
+          <p className="official-card__description">
+            {official.description || note}
+          </p>
+          </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
 function Government() {
   const [officials, setOfficials] = useState([]);
-  const [neighborhoodOfficials, setNeighborhoodOfficials] = useState([]);
+  const [categories, setCategories] = useState([]);
   useEffect(() => {
-    fetch(`${API}/officials`)
-      .then((response) => response.ok ? response.json() : Promise.reject())
-      .then((body) => setOfficials(body.data))
+    Promise.all([
+      fetch(`${API}/officials`).then((response) => response.ok ? response.json() : Promise.reject()),
+      fetch(`${API}/official-categories`).then((response) => response.ok ? response.json() : Promise.reject()).catch(() => ({ data: [] })),
+    ])
+      .then(([officialBody, categoryBody]) => {
+        setOfficials(officialBody.data || []);
+        setCategories(categoryBody.data || []);
+      })
       .catch(() => setOfficials([]));
-    fetch(`${API}/neighborhood-officials`)
-      .then((response) => response.ok ? response.json() : Promise.reject())
-      .then((body) => setNeighborhoodOfficials(body.data || []))
-      .catch(() => setNeighborhoodOfficials([]));
   }, []);
+  const groups = categories.length
+    ? categories
+        .map((category) => ({
+          category,
+          items: officials.filter((official) => (official.category || "pemerintahan") === category.slug),
+        }))
+        .filter((group) => group.items.length)
+    : officials.length ? [{ category: { slug: "pemerintahan" }, items: officials }] : [];
   return (
     <Layout>
       <PageHero
@@ -907,60 +948,27 @@ function Government() {
         desc="Struktur perangkat Pemerintah Desa Tanjungjaya."
       />
       <section className="mx-auto max-w-7xl px-5 py-16">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {officials.map((official, i) => (
-            <article
-              key={official.id}
-              className={`official-card${official.photo_url ? " official-card--photo" : ""}`}
-            >
-              {official.photo_url && <div className="official-card__photo" aria-hidden="true">
-                <img src={mediaUrl(official.photo_url)} alt="" loading="lazy" decoding="async" />
-              </div>}
-              <div className="official-card__content">
-              <div className="official-card__top" aria-hidden="true">
-                <span className="official-card__icon"><Users size={22} strokeWidth={1.6} /></span>
-                <span className="official-card__number">{String(i + 1).padStart(2, "0")}</span>
-              </div>
-              <div className="official-card__details">
-              <p className="official-card__position">
-                {official.position}
-              </p>
-              <h3 className="official-card__name">
-                {official.name || "Nama belum tersedia"}
-              </h3>
-              <p className="official-card__description">
-                {official.description || note}
-              </p>
-              </div>
-              </div>
-            </article>
-          ))}
-          {!officials.length && (
-            <p className="col-span-full rounded-2xl border border-dashed p-10 text-center text-sm text-stone-500">
-              Struktur perangkat desa belum diisi oleh admin.
-            </p>
-          )}
-        </div>
-        {neighborhoodOfficials.length > 0 && (
-          <section className="mt-10 border-t border-stone-200 pt-8" aria-labelledby="neighborhood-title">
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-earth-500">Pelayanan kewilayahan</p>
-            <h2 id="neighborhood-title" className="mt-1 font-serif text-2xl text-forest-950">Ketua RT & RW</h2>
-            <p className="mt-2 text-sm text-stone-500">Perangkat lingkungan Desa Tanjungjaya.</p>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
-              {neighborhoodOfficials.map((official) => (
-                <article key={official.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-                  <div className="aspect-[4/3] bg-sage-100">
-                    {official.photo_url ? <img src={mediaUrl(official.photo_url)} alt={official.name} className="h-full w-full object-cover object-top" loading="lazy" /> : <div className="grid h-full place-items-center text-forest-800"><Users size={28} /></div>}
-                  </div>
-                  <div className="p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[.12em] text-earth-500">Ketua {official.level.toUpperCase()} {String(official.number).padStart(2, "0")}</p>
-                    <h3 className="mt-1 truncate text-sm font-bold text-forest-950">{official.name}</h3>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+        {!officials.length && (
+          <p className="rounded-2xl border border-dashed p-10 text-center text-sm text-stone-500">
+            Struktur perangkat desa belum diisi oleh admin.
+          </p>
         )}
+        {groups.map(({ category, items }, index) => (
+          <section
+            key={category.slug}
+            className={index ? "mt-10 border-t border-stone-200 pt-8" : ""}
+            aria-labelledby={`official-title-${category.slug}`}
+          >
+            {category.slug !== "pemerintahan" && (
+              <div className="mb-5">
+                <p className="text-xs font-bold uppercase tracking-[.18em] text-earth-500">{category.eyebrow || "Lembaga Desa"}</p>
+                <h2 id={`official-title-${category.slug}`} className="mt-1 font-serif text-2xl text-forest-950">{category.title || category.name}</h2>
+                {category.description && <p className="mt-2 text-sm text-stone-500">{category.description}</p>}
+              </div>
+            )}
+            <OfficialCards items={items} />
+          </section>
+        ))}
       </section>
     </Layout>
   );
@@ -2034,8 +2042,8 @@ function AdminContentEditor() {
 }
 function AdminDashboard() {
   const { pathname } = useLocation();
-  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/potensi': 'potentials', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials', '/admin/rt-rw': 'areas' }[pathname] || 'dashboard';
-  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, potentials: AdminPotentials, profile: AdminContentEditor, officials: AdminOfficials, areas: AdminAreas }} />;
+  const initialPanel = { '/admin/buku-tamu': 'guestbook', '/admin/pesan': 'contacts', '/admin/pengajuan': 'applications', '/admin/berita': 'news', '/admin/layanan': 'services', '/admin/potensi': 'potentials', '/admin/profil': 'profile', '/admin/perangkat-desa': 'officials' }[pathname] || 'dashboard';
+  return <AdminWorkspace initialPanel={initialPanel} panels={{ guestbook: AdminGuestbook, contacts: AdminContacts, applications: AdminApplications, news: AdminNews, services: AdminServices, potentials: AdminPotentials, profile: AdminContentEditor, officials: AdminOfficials }} />;
 }
 function App() {
   return (

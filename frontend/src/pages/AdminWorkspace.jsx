@@ -41,8 +41,7 @@ const navigation = [
   ["potentials", "Potensi lokal", Sprout, "Kelola potensi dan UMKM desa"],
   ["guestbook", "Buku tamu", BookOpen, "Catatan kunjungan ke kantor desa"],
   ["contacts", "Pesan warga", Mail, "Baca dan tindak lanjuti pesan masuk"],
-  ["officials", "Perangkat desa", Users, "Kelola struktur pemerintahan"],
-  ["areas", "Data RT/RW", MapPinned, "Kelola rekap unit wilayah RT dan RW"],
+  ["officials", "Pemerintahan & lembaga desa", Users, "Kelola struktur pemerintahan, RT/RW, dan lembaga desa"],
   [
     "profile",
     "Profil & penduduk",
